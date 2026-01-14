@@ -3,7 +3,7 @@
 ## Overview
 This document describes the Client flow for posting jobs, the multi-step job form, business rules (escrow, budget minimums, expiry), recommended database models, API endpoints, payments/escrow flow (Razorpay), attachments handling, and validations.
 
-Purpose: enable clients to post jobs, fund the required escrow (25% of budget), and publish jobs so freelancers can discover and apply.
+Purpose: enable clients to post jobs and publish jobs so freelancers can discover and apply.
 
 ---
 
@@ -13,12 +13,11 @@ Purpose: enable clients to post jobs, fund the required escrow (25% of budget), 
 Before posting a job, the system MUST ensure the client:
 - has **completed onboarding** (User.isOnboardingCompleted === true)
 - has **verified email & mobile** (isEmailVerified && isMobileVerified)
-- has **wallet balance >= 25% of job budget** (or is able to pay via payment gateway)
 
-If any precondition fails, the client is redirected to the appropriate flow: onboarding, verification, or wallet top-up.
+If any precondition fails, the client is redirected to the appropriate flow: onboarding or verification.
 
 ### Step 1 — Click "Post a Job"
-From dashboard, client clicks "Post a Job". System checks Profile completed and Wallet funded (or ready to pay via Razorpay).
+From dashboard, client clicks "Post a Job". System checks Profile completed and verification requirements.
 
 ### Step 2 — Multi-step Job Creation Wizard
 Wizard sections (recommended):
@@ -31,7 +30,7 @@ Wizard sections (recommended):
 (See Section 2 for detailed fields.)
 
 ### Step 3 — Job Published
-When escrow is funded and publish action confirmed, job status becomes `OPEN` and is visible to freelancers.
+When publish action is confirmed, job status becomes `OPEN` and is visible to freelancers.
 
 ---
 
@@ -53,8 +52,6 @@ When escrow is funded and publish action confirmed, job status becomes `OPEN` an
 | deadline (date) | ❌ | 2026-03-01 |
 | experienceLevel | ❌ | `entry` / `intermediate` / `expert` |
 
-Business rule: budgetAmount >= 500 INR. Escrow required = ceil(25% * budgetAmount).
-
 ### Section 3 — Attachments
 Optional files: PDF, images, docs, ZIP. Store as signed URLs or via `/uploads` endpoint. Save metadata: { url, filename, mimeType, size }.
 
@@ -65,23 +62,16 @@ Optional files: PDF, images, docs, ZIP. Store as signed URLs or via `/uploads` e
 | allowNegotiation | ✅ | boolean (default true) |
 | requireVerifiedFreelancer | ❌ | boolean, filters applicants |
 
-### Section 5 — Escrow Confirmation
-System displays:
-- Job Budget: ₹X
-- Required escrow (25%): ₹Y
-
-Client clicks **Fund & Publish** and completes payment via Razorpay (UPI or other methods). On successful capture, the job becomes `OPEN` and escrow record is created.
+### Section 5 — Confirmation
+Client reviews all job details and clicks **Publish**. The job becomes `OPEN` and is immediately visible to freelancers.
 
 ---
 
 ## 3) Business rules & lifecycle
-- Minimum budget: **₹500**
-- **25% escrow mandatory** to publish
 - Optional: `maxOpenJobs` configuration per client (enforced on create)
 - Job auto-expires after **30 days** (set `expiresAt = createdAt + 30d`)
 - Client can **edit** job only if `proposalsCount === 0` and job is not `OPEN`/`FILLED`/`CLOSED`
-- Deleting a job triggers **refund** of escrow (if captured) and sets status `DELETED` or `CANCELLED` with `deletedAt`
-- On job being filled and milestones released, escrow is released to freelancer (handled by separate workflow)
+- Deleting a job sets status `DELETED` or `CANCELLED` with `deletedAt`
 
 ---
 
@@ -115,10 +105,8 @@ const jobSchema = new mongoose.Schema({
   description: { type: String, required: true },
   skills: [{ type: String }],
 
-  budgetAmount: { type: Number, required: true, min: 500 },
+  budgetAmount: { type: Number, required: true },
   currency: { type: String, default: 'INR' },
-  escrowAmount: { type: Number, required: true },
-  escrowPaid: { type: Boolean, default: false },
 
   deadline: { type: Date },
   experienceLevel: { type: String, enum: ['entry','intermediate','expert'] },
@@ -139,35 +127,10 @@ const jobSchema = new mongoose.Schema({
   deletedAt: { type: Date }
 });
 
-// Pre-save compute escrowAmount = Math.ceil(0.25 * budgetAmount)
 ```
 
 Notes:
-- `escrowAmount` computed on create; store explicitly for audit.
 - Index `client`, `status`, `expiresAt`, `category` for queries.
-
-
-### Escrow / Payment record
-```javascript
-const escrowSchema = new mongoose.Schema({
-  job: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true, index: true },
-  client: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  amount: { type: Number, required: true },
-
-  paymentProvider: { type: String, enum: ['RAZORPAY','RAZORPAY_UPI'], default: 'RAZORPAY' },
-  providerOrderId: String, // order id returned by gateway
-  providerPaymentId: String, // payment id when captured
-  status: { type: String, enum: ['PENDING','PAID','REFUNDED','FAILED'], default: 'PENDING' },
-  meta: { type: Object },
-
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
-```
-
-Notes:
-- Keep payment provider ids to allow refunds and ledger mapping.
-- On successful capture, set `status = PAID` and mark `job.escrowPaid = true`, `job.status = OPEN`, set `job.expiresAt`.
 
 ---
 
@@ -198,50 +161,6 @@ Response (201):
 { "success": true, "data": { "job": { /* job doc */ } } }
 ```
 
-Option: to publish and request payment in single call send `publish: true` and backend responds with a payment order
-
-Request (publish & fund):
-```json
-POST /api/v1/jobs
-{
-  /* job fields */, 
-  "publish": true
-}
-```
-
-Response (202 - Payment required):
-```json
-{ "success": true, "data": { "jobId": "<id>", "paymentOrder": { "provider": "RAZORPAY", "orderId": "order_abc", "amount": 125000 } } }
-```
-
-(amount in paise when using Razorpay)
-
----
-
-### POST /api/v1/jobs/:id/fund
-Create a payment order or mark a captured payment (used when separate flow used)
-
-Request:
-```json
-POST /api/v1/jobs/:id/fund
-{ "paymentMethod": "upi", "returnUrl": "https://app.example.com/payments/return" }
-```
-
-Response:
-```json
-{ "success": true, "data": { "orderId": "order_abc", "paymentUrl": "https://checkout.razorpay.com/xyz" } }
-```
-
-Frontend completes payment and Razorpay triggers webhook.
-
----
-
-### POST /api/v1/payments/webhook
-Payment gateway (Razorpay) will POST webhooks to this endpoint.
-On `payment.captured` events validate signature, find escrow record by `providerOrderId` or `providerPaymentId`, set `status = PAID`, update `job.escrowPaid = true`, set `job.status = OPEN`, set `job.expiresAt = now + 30d`, and notify client / post job to feed.
-
-Response: HTTP 200 to acknowledge.
-
 ---
 
 ### PATCH /api/v1/jobs/:id
@@ -253,83 +172,67 @@ PATCH /api/v1/jobs/:id
 { "title": "Updated title", "budgetAmount": 6000 }
 ```
 
-Notes: If `budgetAmount` changes and escrow was already paid, require additional capture or refund flow to rebalance escrow.
-
 ---
 
 ### DELETE /api/v1/jobs/:id
-Delete (cancel) a job. If escrow captured, initiate refund via payment provider and set job status `CANCELLED` or `DELETED`.
+Delete (cancel) a job and set job status `CANCELLED` or `DELETED`.
 
 Response (200):
 ```json
-{ "success": true, "message": "Job cancelled and refund initiated" }
+{ "success": true, "message": "Job cancelled" }
 ```
 
 ---
 
-## 7) Payments & Escrow flow (Razorpay) — high level
-1. Client clicks **Fund & Publish** → backend creates a Razorpay Order with amount = escrowAmount (INR*100 paise) via Razorpay Orders API.
-2. Backend returns order id and payment details to frontend.
-3. Frontend completes UPI/checkout; on success Razorpay emits `payment.captured` webhook.
-4. Webhook handler verifies signature, marks escrow record `PAID`, updates job `escrowPaid = true`, `status = OPEN`, sets `expiresAt`.
-5. For refunds (job deletion/cancellation) call Razorpay Refunds API with `payment_id` and mark `escrow.status = REFUNDED` once processed.
-
-Important: Don't trust frontend to mark payments. Always rely on webhook verification.
-
----
-
-## 8) Attachments & file handling
+## 7) Attachments & file handling
 - Prefer direct uploads to storage provider (S3/GCS) using signed URLs.
 - Save metadata in `job.attachments` (url, filename, mimeType, size).
 - If backend receives files, validate MIME and size, scan for malware if possible.
 
 ---
 
-## 9) Indexes, performance & queries
+## 8) Indexes, performance & queries
 - Index: `client`, `status`, `expiresAt`, `category` and `skills` for discovery.
 - Use text index on `title` and `description` for search.
 - Paginate `/jobs` list and add filters: category, budget range, experienceLevel, visibility.
 
 ---
 
-## 10) Notifications & webhooks
+## 9) Notifications & webhooks
 - Send notifications on: job published, payment captured, refund processed, job expired, proposal received.
 - Provide webhook for partner integrations if required.
 
 ---
 
-## 11) Background tasks & expiry
+## 10) Background tasks & expiry
 - Scheduler (cron or queue-based) runs daily to mark jobs with `expiresAt < now` as `EXPIRED` and trigger notifications.
 - On expiry evaluate business rules for refund (the default behaviour: do not auto-refund; refund only on explicit delete/cancel to avoid gaming the system). Decide based on product policy.
 
 ---
 
-## 12) Security & validations
+## 11) Security & validations
 - Authz: only the job `client` may edit/cancel the job.
-- Validate budget >= 500; reject otherwise.
 - Sanitize all text inputs to avoid XSS.
 - Verify file uploads for allowed MIME types and size limits.
 - Rate limit job creation to prevent abuse.
 
 ---
 
-## 13) Error codes & responses
-- 400 Bad Request — validation errors (e.g. budget too low)
+## 12) Error codes & responses
+- 400 Bad Request — validation errors
 - 401 Unauthorized — not authenticated
 - 403 Forbidden — not client or not allowed to edit
 - 404 Not Found — job not found
-- 409 Conflict — publish call when funds insufficient or concurrent publish
+- 409 Conflict — concurrent publish attempt
 - 500 Server Error — unexpected failures
 
 ---
 
-## 14) Next steps & implementation checklist
-- [ ] Add `Job` and `Escrow` Mongoose models (`models/Job.js`, `models/Escrow.js`)
+## 13) Next steps & implementation checklist
+- [ ] Add `Job` Mongoose model (`models/Job.js`)
 - [ ] Add job routes & controllers (`routes/jobRoutes.js`, `controllers/jobController.js`)
-- [ ] Implement payment creation (`/api/v1/jobs/:id/fund`) and webhook (`/api/v1/payments/webhook`)
 - [ ] Implement cron job to expire jobs
-- [ ] Add background refund handling and ledger entries for wallet
-- [ ] Add tests (unit + integration for payment webhooks)
+- [ ] Add tests (unit + integration)
 
 ---
 
