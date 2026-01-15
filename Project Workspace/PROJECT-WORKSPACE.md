@@ -1308,9 +1308,9 @@ Analytics & Reporting:
 
 ## References
 
-- **Negotiations**: [2.NEGOTIATION.md](2.NEGOTIATION.md)
-- **Chat**: [2.PROJECT-CHAT.md](2.PROJECT-CHAT.md)
-- **Payments**: [PROJECT-PAYMENT.md](PROJECT-PAYMENT.md)
+- **Negotiations**: [5.NEGOTIATION.md](5.NEGOTIATION.md)
+- **Chat**: [7.PROJECT-CHAT.md](7.PROJECT-CHAT.md)
+- **Payments**: [6.PROJECT-PAYMENT.md](6.PROJECT-PAYMENT.md)
 - **Milestones**: (Document pending)
 
 ---
