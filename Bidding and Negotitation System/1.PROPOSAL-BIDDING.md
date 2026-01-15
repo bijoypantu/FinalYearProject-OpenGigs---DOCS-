@@ -6,7 +6,7 @@
 
 ## Overview
 
-The Proposal/Bidding module enables freelancers to make offers (proposals) on client jobs, supports shortlisting, acceptance, and hiring to create a contract. It enforces business rules (profile completion, limits), ensures financial safety (escrow rules), and emits notifications and events for UX and automations.
+The Proposal/Bidding module enables freelancers to make offers (proposals) on client jobs, supports shortlisting, acceptance, and hiring to create a contract. It enforces business rules (profile completion, limits) and emits notifications and events for UX and automations.
 
 > NOTE: Negotiation / counter-offers are documented separately in a dedicated document.
 
@@ -30,11 +30,11 @@ The Proposal/Bidding module enables freelancers to make offers (proposals) on cl
 ---
 
 ## User Flows (High-level)
-1. Client posts job (Job status: `OPEN`, escrow funded badge shown)
+1. Client posts job (Job status: `OPEN`)
 2. Freelancers see job on Find Work and open Job Details
 3. Freelancer submits Proposal (bid amount, days, cover letter, attachments)
 4. Client reviews proposals, sorts/filters, and shortlists candidates
-5. Client hires a candidate (creates Contract), job changes to `IN_PROGRESS`, remaining escrow locked; other proposals auto-rejected
+5. Client hires a candidate (creates Contract), job changes to `IN_PROGRESS`; other proposals auto-rejected
 6. Freelancer can withdraw (before hiring) and proposals may be auto-rejected when job closes
 
 > NOTE: Negotiation / counter-offers are covered in a separate document.
@@ -91,8 +91,7 @@ Notes:
   - They have < 3 (configurable) active jobs
 - One freelancer = one proposal per job
 - Proposal cannot be edited after submission; they can withdraw and submit a new proposal only if allowed by policy
-- Client cannot hire unless escrow is funded (check `job.escrowFunded === true`)
-- Protect from race conditions when hiring: use DB transaction or atomic update that verifies job status and escrow before creating contract and changing statuses
+- Protect from race conditions when hiring: use DB transaction or atomic update that verifies job status before creating contract and changing statuses
 
 > NOTE: Negotiation / counter-offers are documented separately.
 
@@ -140,7 +139,6 @@ Authentication: Bearer token; role-based checks required.
 - Auth: job owner
 - Body: { "proposalId": "..." }
 - Server actions:
-  - Validate escrow funded
   - Create Contract record
   - Job status -> `IN_PROGRESS`
   - Proposal status -> `ACCEPTED`
@@ -173,7 +171,7 @@ Implement notifications to:
 ## UI / UX Notes
 
 Freelancer view:
-- Job card shows budget, skills, client rating, escrow badge
+- Job card shows budget, skills, client rating
 - Job details page: `Submit Proposal` button disabled if profile incomplete
 - Proposal form with live validation and sample attachments
 
@@ -222,7 +220,7 @@ Accessibility & Usability:
 ---
 
 ## Example (short)
-1. Client posts a job: “Build landing page – ₹5000” (escrow funded)
+1. Client posts a job: "Build landing page – ₹5000"
 2. A bids ₹4800 / 6 days; B bids ₹4500 / 5 days
 3. Client shortlists B.
 4. Client hires B → contract created, job `IN_PROGRESS`, others `REJECTED`
@@ -238,7 +236,7 @@ Accessibility & Usability:
 
 ## Acceptance Criteria
 - Submit proposal with valid fields creates document and notifies job owner
-- Hiring fails atomically if job escrow not funded or job already closed
+- Hiring fails atomically if job already closed
 - Withdraw prevents actions when not allowed
 
 ---
