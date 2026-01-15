@@ -1,249 +1,693 @@
-# Project Payment Module Documentation
+# Project Workspace Documentation
 
 ## Overview
 
-The Project Payment Module handles payment processing with flexible payment type selection. 
+The **Project Workspace** is the unified hub where clients and freelancers collaborate after hiring. It consolidates all project management tools into a single interface with six integrated tabs, eliminating the need to switch between multiple screens.
 
-**Payment type decision happens after hiring**, during the negotiation and agreement phase, where **client and freelancer decide together** whether to proceed with:
-- **No Milestone (Fixed Price/Hourly Rate)**: Simple payment after work completion
-- **Milestone-based Payment**: Staged payments as client approves each milestone
+> 📌 **Note**: The Project Workspace is created immediately after a freelancer is hired and remains the primary interface throughout the entire project lifecycle until completion or archival.
 
----
-
-## 0. Payment Type Decision Process (After Hiring)
-
-### When Does This Happen?
-
-- **Timing**: After freelancer proposal is accepted and agreement is signed, before work begins
-- **Duration**: Client and freelancer have time to discuss and agree on payment structure
-
-### How They Decide Together
-
-**Step 1: Client Initiates Discussion**
-- After hiring freelancer and agreement is signed
-- Client opens a "Payment & Project Structure" dialog in the project/job window
-- Displays both payment options with details
-
-**Step 2: Present Both Options**
-
-```
-Option A: Full Payment (Recommended for projects ≤ ₹10,000)
-├─ Simple and straightforward
-├─ Freelancer completes entire work
-├─ Client reviews and pays in one go
-└─ Best for well-defined, smaller projects
-
-Option B: Milestone-based (Recommended for projects > ₹10,000)
-├─ Break work into multiple deliverables
-├─ Payment released as each milestone is approved
-├─ Better control and quality assurance
-└─ Recommended for complex/high-value projects
-```
-
-**Step 3: Client & Freelancer Communicate**
-- Both discuss which option suits the project best
-- Can chat in the negotiation/project room to discuss:
-  - Project complexity
-  - Delivery timeline
-  - Comfort level with payment structure
-  - Any concerns or preferences
-
-**Step 4: Client Makes Final Selection**
-- Client chooses one option in the job window
-- System confirms: "You've selected [Option]. Work can now begin."
-- Selection is locked (cannot change mid-project)
-
-**Step 5: Proceed with Chosen Payment Flow**
-
-**If Option A (Full Payment):**
-→ Freelancer begins work immediately
-→ Upon completion: Upfront payment notification (if amount > ₹3,000)
-→ Client reviews and approves
-→ Payment processed
-
-**If Option B (Milestone-based):**
-→ Client and freelancer together define milestones
-→ Milestones stored and locked
-→ Freelancer begins work on first milestone
-→ Sequential approval and payment process
+### Key Purpose
+- **Single Source of Truth**: All project information, communication, and transactions in one place
+- **Seamless Collaboration**: No context switching between different tools
+- **Real-time Updates**: System messages and notifications keep both parties informed
+- **Integrated Workflows**: Milestones → Approvals → Payments → Chat all connected
 
 ---
 
-## 1. Payment Scenarios (After Decision)
+## 1. Workspace Architecture
 
-### Scenario A: No Milestone Payment (Full Payment Option)
+### Core Concept
 
-**Use Case:** Complete projects without intermediate deliverables
-
-#### Amount ≤ ₹3,000
-- Freelancer begins work
-- Client reviews completed work
-- Client pays **full amount**
-- Project files handed over to client
-- Job marked as completed
-- Freelancer receives payment
-
-**No escrow deposit required**
-
-#### Amount > ₹3,000
-- Freelancer begins work
-- Upon completion, client reviews work
-- **System shows notification** (in job window): "Consider paying 25% upfront to maintain trust and flexibility between parties. You'll be refunded if work isn't done properly." (Optional - can be dismissed)
-- **If client decides to pay upfront:**
-  - Client pays **25% upfront** (held in escrow)
-  - Freelancer completes remaining work
-  - Upon completion and approval: remaining **75%** is paid
-  - Project files handed to client
-- **If client declines upfront payment:**
-  - Freelancer completes work
-  - Upon completion and approval: client pays **full amount**
-  - Project files handed to client
-
-**Database Storage:**
 ```
-paymentType: "FULL"
-jobAmount: Number
-upfrontPaymentSuggested: Boolean (if > 3000)
-upfrontPaymentAccepted: Boolean
-escrowAmount: 0.25 * jobAmount (if accepted)
+Project Workspace = Unified Interface (6 Integrated Tabs)
+                   + Shared Project Context
+                   + Real-time Synchronization
+                   + Role-based Access Control
+```
+
+### When is Workspace Created?
+
+**Trigger**: When `Project.status = "ACTIVE"` (immediately after hiring)
+
+```
+Job Posted
+  ↓
+Freelancer Applies
+  ↓
+Negotiation Chat Opens (proposal-scoped)
+  ↓
+Agreement Signed & Freelancer Hired
+  ↓
+✅ PROJECT WORKSPACE CREATED
+  ↓
+Both parties can access at:
+├─ Dashboard → [Open Project] → Workspace
+└─ Or direct project link
+```
+
+### Workspace Lifecycle
+
+```
+ACTIVE (Work in Progress)
+  ↓ Milestones submitted, approved, payments released
+  ↓
+UNDER_REVIEW (Final submission pending approval)
+  ↓ Client reviews deliverables
+  ↓
+COMPLETED (All milestones approved & payments released)
+  ↓ Project marked as complete
+  ↓
+ARCHIVED (Can view but not edit)
 ```
 
 ---
 
-### Scenario B: Milestone-based Payment (Milestone Option)
+## 2. Workspace Structure
 
-**Use Case:** Complex projects with multiple deliverables and staged payments
+### Tab-Based Interface
 
-**When is this chosen?**
-- Client and freelancer decided together (after hiring) to use milestone-based payment
-- This happens during negotiation/agreement phase before work begins
-
-**Total Amount Check:**
-- If **total project cost > ₹10,000**:
-  - During Option selection: System suggests milestone-based as recommended option
-  - Client can still choose Full Payment if preferred
-- If **total project cost ≤ ₹10,000**:
-  - Either option is available; client and freelancer decide together
-
-**System Behavior** (After milestone option is selected by client and freelancer):
-
-1. **Milestone Definition Phase** (Immediately after payment type is selected)
-   - Client and freelancer **together define:**
-     - Milestone titles and descriptions
-     - Amount for each milestone
-     - Expected delivery timeline for each
-   - Both parties must agree on milestone structure before work begins
-   - Milestones stored and locked in database
-
-2. **Upfront Payment Suggestion** (Optional, shown as notification)
-   - If **total project cost > ₹3,000**:
-     - System shows notification in job window: "Consider paying 25% of total amount (₹X) upfront to maintain trust and flexibility. You'll be refunded if work isn't done properly." (Optional)
-     - If client decides to pay:
-       - Client pays **25% of total amount** (held in escrow)
-       - Work begins
-     - If client declines or dismisses:
-       - Work begins without upfront payment
-
-3. **Milestone Execution Phase**
-   - Freelancer begins work on first milestone
-   - Upon completion:
-     - Freelancer submits work with details
-     - Client reviews the milestone work
-     - Client **approves or rejects** the work
-   
-4. **Payment Release**
-   - **If approved:**
-     - Client pays milestone amount
-     - Payment released to freelancer
-     - Milestone marked as **COMPLETED**
-     - Work moves to **next milestone**
-     - Process repeats for all remaining milestones
-   
-   - **If rejected:**
-     - Milestone marked as **REJECTED**
-     - Freelancer notified with rejection reason
-     - Freelancer can resubmit revised work
-     - Upon resubmission: client reviews again
-     - Payment released only after approval
-
-5. **Final Milestone**
-   - When last milestone is approved and paid:
-     - All project files handed to client
-     - Project marked as **COMPLETED**
-     - If upfront 25% escrow was paid: it's counted toward final balance
-
-**Example Milestone Structure:**
-| # | Title | Description | Amount | Status |
-|---|-------|-------------|--------|--------|
-| 1 | UI Design | Homepage & dashboard mockups | ₹5,000 | PENDING |
-| 2 | Backend API | REST API implementation | ₹8,000 | PENDING |
-| 3 | Frontend Dev | React component implementation | ₹5,000 | PENDING |
-| 4 | Testing & QA | Full testing & bug fixes | ₹2,000 | PENDING |
-| | **TOTAL** | | **₹20,000** | |
-
-**Database Storage:**
 ```
-paymentType: "MILESTONE"
-jobAmount: Number
-totalAmount: Number (sum of all milestones)
-upfrontPaymentSuggested: Boolean (if totalAmount > 3000)
-upfrontPaymentAccepted: Boolean
-escrowAmount: 0.25 * totalAmount (if accepted)
-milestones: [MilestoneSchema]
-milestoneLocked: Boolean (true - cannot change after work begins)
+Project Workspace - Header
+┌─────────────────────────────────────────────────────────┐
+│ Project: Build Website | Budget: ₹50,000 | Status: Active
+│ Deadline: Mar 15, 2026 | Freelancer: John (★★★★★)      │
+├─────────────────────────────────────────────────────────┤
+│ [Overview] [Milestones] [Files] [Chat] [Activity] [Payments] │
+├─────────────────────────────────────────────────────────┤
+│ [Tab Content Area]                                      │
+│                                                         │
+│ (Content changes based on selected tab)                 │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Tab Order & Hierarchy
+
+1. **[Overview]** - Primary workspace entry point
+2. **[Milestones]** - Deliverables & approvals
+3. **[Files]** - Project file storage
+4. **[Chat]** - Real-time communication
+5. **[Activity]** - Event timeline
+6. **[Payments]** - Transaction & payment tracking
+
+---
+
+## 3. Tab-by-Tab Breakdown
+
+### Tab 1: Overview (Default Landing)
+
+**Purpose**: Single page summary of entire project
+
+**Components**:
+
+```
+┌──────────────────────────────────────────┐
+│ PROJECT OVERVIEW                         │
+├──────────────────────────────────────────┤
+│                                          │
+│ 1. PROJECT SUMMARY                       │
+│    Title: Build Website                  │
+│    Created: Jan 5, 2026 | Started: Jan 5 │
+│    Budget: ₹50,000 | Spent: ₹15,000     │
+│    Deadline: Mar 15, 2026 (59 days left) │
+│    Status: Active (60% complete)         │
+│                                          │
+│ 2. FREELANCER PROFILE                    │
+│    Name: John Doe                        │
+│    Rating: ★★★★★ (4.8/5)                │
+│    Completed: 47 projects | Earned: ₹2.3L │
+│    Response Time: < 2 hours              │
+│    [View Full Profile]                   │
+│                                          │
+│ 3. MILESTONE PROGRESS                    │
+│    Total: 4 | Completed: 2 | Pending: 2 │
+│    ░░░░░░░░░░░░░░░░░░░░░░ 50% Progress  │
+│                                          │
+│    ✅ UI Design (₹10,000) - Approved Jan 10│
+│    ✅ Database Schema (₹10,000) - Approved Jan 15│
+│    ⏳ Backend API (₹15,000) - Due Jan 25 │
+│    ⏳ Frontend Integration (₹15,000) - Due Feb 5│
+│                                          │
+│    [View All Milestones] →               │
+│                                          │
+│ 4. RECENT ACTIVITY                       │
+│    Jan 15, 10:30 AM - John uploaded files│
+│    Jan 15, 9:15 AM - Database milestone approved│
+│    Jan 15, 8:00 AM - John sent message   │
+│    Jan 14, 4:30 PM - Payment released    │
+│                                          │
+│    [View Full Timeline] →                │
+│                                          │
+│ 5. QUICK ACTIONS                         │
+│    [View All Files] [Send Message] [Release Payment] │
+│    [Approve Milestone] [End Project]     │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+**Data Displayed**:
+- Project meta (title, budget, deadline, status)
+- Freelancer credentials & availability
+- Milestone completion percentage
+- Last 5 activities
+- Quick action buttons
+
+**Permissions**:
+- **Client**: View all, edit deadline/budget (if allowed), release payments
+- **Freelancer**: View all, submit milestones, upload files
+
+---
+
+### Tab 2: Milestones (Deliverables & Approvals)
+
+**Purpose**: Track, submit, and approve work deliverables
+
+**Components**:
+
+```
+┌──────────────────────────────────────────┐
+│ MILESTONES                               │
+├──────────────────────────────────────────┤
+│ Filter: [All] [Pending] [Submitted] [Approved] [Rejected]
+│ Sort: [By Due Date] [By Amount] [By Status]│
+├──────────────────────────────────────────┤
+│                                          │
+│ 1️⃣ UI Design                            │
+│    Amount: ₹10,000 | Due: Jan 10, 2026  │
+│    Status: ✅ APPROVED (Jan 10)          │
+│    Description: Design all UI mockups   │
+│    [View Submission] [View Details]     │
+│                                          │
+│ 2️⃣ Database Schema                      │
+│    Amount: ₹10,000 | Due: Jan 20, 2026  │
+│    Status: ✅ APPROVED (Jan 15)          │
+│    Description: Create normalized DB    │
+│    [View Submission] [View Details]     │
+│                                          │
+│ 3️⃣ Backend API                          │
+│    Amount: ₹15,000 | Due: Jan 25, 2026  │
+│    Status: 🔄 SUBMITTED (Jan 23)        │
+│    Description: RESTful API endpoints   │
+│                                          │
+│    Submitted Files:                      │
+│    📄 api-documentation.pdf              │
+│    📁 backend-code.zip                   │
+│    📄 api-test-results.json              │
+│                                          │
+│    Freelancer Note: "All endpoints      │
+│    documented and tested"                │
+│                                          │
+│    CLIENT ACTIONS:                       │
+│    [✓ Approve] [✗ Request Changes]      │
+│                                          │
+│ 4️⃣ Frontend Integration                 │
+│    Amount: ₹15,000 | Due: Feb 5, 2026   │
+│    Status: ⏳ NOT STARTED               │
+│    Description: Integrate frontend      │
+│    [Submit Milestone]                    │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+**Milestone States**:
+
+```
+1. NOT_STARTED (Freelancer hasn't begun)
+2. IN_PROGRESS (Freelancer is working)
+3. SUBMITTED (Freelancer submitted for review)
+4. APPROVED (Client approved)
+5. CHANGES_REQUESTED (Client asked for revisions)
+6. RESUBMITTED (Freelancer resubmitted after changes)
+7. REJECTED (Client rejected)
+8. COMPLETED (Payment released to freelancer)
+```
+
+**Data Per Milestone**:
+- Title, description, amount, due date
+- Submission files & links
+- Freelancer notes
+- Client feedback
+- Approval/rejection reason
+- Timeline of state changes
+
+**Actions**:
+- **Freelancer**: Submit work, view feedback, resubmit changes
+- **Client**: Approve, request changes, reject, release payment
+
+---
+
+### Tab 3: Files (Centralized Storage)
+
+**Purpose**: Store and organize all project files
+
+**Components**:
+
+```
+┌──────────────────────────────────────────┐
+│ FILES                                    │
+├──────────────────────────────────────────┤
+│ [Upload File] [Create Folder] [Search]  │
+│                                          │
+│ Folder View:                             │
+│ 📁 Submitted_Work                        │
+│    ├─ UI_Design_Mockups (Jan 10)        │
+│    │  ├─ homepage.figma                  │
+│    │  ├─ dashboard.figma                 │
+│    │  └─ mobile-layouts.pdf              │
+│    │                                     │
+│    ├─ Database_Schema (Jan 15)          │
+│    │  ├─ ER_Diagram.png                  │
+│    │  └─ schema.sql                      │
+│    │                                     │
+│    └─ Backend_API (Jan 23)              │
+│       ├─ api-docs.pdf                    │
+│       ├─ api-code.zip                    │
+│       └─ test-results.json               │
+│                                          │
+│ 📁 Client_Resources                      │
+│    ├─ Brand_Guidelines.pdf               │
+│    ├─ Content_Brief.docx                 │
+│    └─ Reference_Sites.md                 │
+│                                          │
+│ 📁 Shared_Assets                         │
+│    ├─ Fonts/ (5 files)                   │
+│    ├─ Icons/ (47 files)                  │
+│    └─ Color_Palette.aco                  │
+│                                          │
+│ Recent Files:                            │
+│ 🔄 api-code.zip (1.2 MB) - Jan 23 by John│
+│ 🔄 test-results.json (45 KB) - Jan 23    │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+**Features**:
+- Folder organization
+- File upload (max 100MB per file, 1GB total)
+- Version control (track file changes)
+- File preview (images, PDFs, code)
+- Download/sharing links
+- Deletion (soft delete, recoverable)
+- Upload timestamps & uploader info
+
+**Permissions**:
+- **Freelancer**: Upload work files, organize folders
+- **Client**: Upload resources, download all files
+- **Both**: View all files, download, create shared folders
+
+---
+
+### Tab 4: Chat (Real-time Communication)
+
+**Purpose**: Instant messaging with project context
+
+> 📌 **Note**: Detailed in [Project-Chat.md](Project-Chat.md)
+
+**Key Integration Points**:
+
+```
+Chat Features Relevant to Workspace:
+├─ Real-time messaging (Socket.io)
+├─ Message notifications with workspace context
+├─ File sharing directly in chat
+├─ System messages for milestone updates
+│  ├─ "Milestone submitted for review"
+│  ├─ "Milestone approved - Payment released"
+│  └─ "File uploaded to project"
+├─ Typing indicators
+├─ Message editing/deletion
+├─ Online/offline status
+└─ Read receipts
+
+Connection to Other Tabs:
+├─ Submit button in [Milestones] → opens chat
+├─ File upload notification → links to [Files] tab
+├─ Approval → sends system message in chat
+└─ Payment release → sends notification + chat message
 ```
 
 ---
 
-## 2. Database Schema Changes
+### Tab 5: Activity (Event Timeline)
 
-### Job Model Updates
+**Purpose**: Chronological log of all project events
+
+**Components**:
+
+```
+┌──────────────────────────────────────────┐
+│ ACTIVITY                                 │
+├──────────────────────────────────────────┤
+│ Filter: [All] [Milestones] [Payments] [Files] [Chat]
+│ Date Range: [Last 7 days] [This Month] [All Time]
+├──────────────────────────────────────────┤
+│                                          │
+│ 📅 January 23, 2026                      │
+│                                          │
+│ 10:30 AM - 📤 File Uploaded              │
+│ John uploaded to "Backend_API" folder    │
+│ Files: api-code.zip (1.2 MB)            │
+│ [View Files]                             │
+│                                          │
+│ 09:15 AM - 🎯 Milestone Submitted       │
+│ "Backend API" submitted for review      │
+│ 3 files attached, 156 lines of code     │
+│ [View Submission]                        │
+│                                          │
+│ 08:00 AM - 💬 Message Sent               │
+│ John: "Completed the API endpoints"     │
+│ [View Message]                           │
+│                                          │
+│ ─────────────────────────────────────────│
+│ 📅 January 15, 2026                      │
+│                                          │
+│ 2:30 PM - ✅ Milestone Approved          │
+│ "Database Schema" approved by client    │
+│ Amount: ₹10,000                          │
+│ [View Details]                           │
+│                                          │
+│ 1:45 PM - 💳 Payment Released            │
+│ ₹10,000 released to John                 │
+│ For: "Database Schema" milestone        │
+│ [View Payment]                           │
+│                                          │
+│ 12:00 PM - 📁 Files Organized            │
+│ Client created folder "Client_Resources"│
+│ [View Folder]                            │
+│                                          │
+│ 10:00 AM - 🎯 Milestone Approved         │
+│ "UI Design" approved by client          │
+│ Amount: ₹10,000                          │
+│ [View Details]                           │
+│                                          │
+│ ─────────────────────────────────────────│
+│ 📅 January 10, 2026                      │
+│                                          │
+│ 4:00 PM - 📤 File Uploaded               │
+│ John uploaded UI mockups                │
+│ Files: 3 Figma files (45 MB)            │
+│ [View Files]                             │
+│                                          │
+│ Load More Activity →                     │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+**Event Types**:
+
+```
+1. MILESTONE_SUBMITTED
+   - When freelancer submits milestone
+   - Shows files & freelancer notes
+
+2. MILESTONE_APPROVED
+   - When client approves milestone
+   - Shows feedback & approval date
+
+3. MILESTONE_REJECTED
+   - When client rejects milestone
+   - Shows rejection reason & feedback
+
+4. PAYMENT_RELEASED
+   - When payment is released
+   - Shows amount, milestone, & payment ID
+
+5. FILE_UPLOADED
+   - When files are uploaded
+   - Shows file details & uploader
+
+6. MESSAGE_SENT
+   - Recent chat messages
+   - Shows message preview
+
+7. FOLDER_CREATED
+   - New folder created
+   - Shows folder name & creator
+
+8. PROJECT_STATUS_CHANGED
+   - Project status changed
+   - Shows old → new status
+
+9. DEADLINE_EXTENDED
+   - Deadline changed
+   - Shows old & new deadline
+```
+
+**Data Per Event**:
+- Timestamp (exact time)
+- Event type & icon
+- Actor (who did it)
+- Description
+- Related entities (links to tabs)
+- Metadata (amounts, files, etc.)
+
+---
+
+### Tab 6: Payments (Transaction Tracking)
+
+**Purpose**: Monitor project finances and payment releases
+
+> 📌 **Note**: Detailed in [6.PROJECT-PAYMENT.md](6.PROJECT-PAYMENT.md)
+
+**Components**:
+
+```
+┌──────────────────────────────────────────┐
+│ PAYMENTS                                 │
+├──────────────────────────────────────────┤
+│ 📊 SUMMARY                               │
+│ Total Budget: ₹50,000                    │
+│ Released: ₹20,000 (40%)                  │
+│ Pending: ₹30,000 (60%)                   │
+│ Progress: ░░░░░░░░░░░░░░░░░░░░░░ 40%   │
+├──────────────────────────────────────────┤
+│                                          │
+│ Payment Method: [Full Payment] / [Milestone-based] │
+│ Current: Milestone-based                 │
+│                                          │
+│ 💳 MILESTONE PAYMENTS                    │
+│                                          │
+│ ✅ Milestone 1: UI Design                │
+│    Amount: ₹10,000                       │
+│    Status: PAID (Jan 10, 2:30 PM)       │
+│    Received by: John                     │
+│    Payment ID: PAY-001                   │
+│    [View Receipt]                        │
+│                                          │
+│ ✅ Milestone 2: Database Schema          │
+│    Amount: ₹10,000                       │
+│    Status: PAID (Jan 15, 1:45 PM)       │
+│    Received by: John                     │
+│    Payment ID: PAY-002                   │
+│    [View Receipt]                        │
+│                                          │
+│ ⏳ Milestone 3: Backend API              │
+│    Amount: ₹15,000                       │
+│    Status: PENDING APPROVAL              │
+│    Approved by client? No (Under review) │
+│    When approved → Auto-released         │
+│    [Approve & Release]                   │
+│                                          │
+│ ⏳ Milestone 4: Frontend Integration     │
+│    Amount: ₹15,000                       │
+│    Status: PENDING SUBMISSION            │
+│    Expected by: Feb 5, 2026              │
+│    [View Details]                        │
+│                                          │
+│ 💰 OPTIONAL UPFRONT PAYMENT              │
+│ (Shown if budget > ₹3,000)               │
+│                                          │
+│ Recommended: ₹5,000 (10% of ₹50,000)    │
+│ Purpose: Build trust & accelerate work  │
+│ [Release Upfront Payment]                │
+│                                          │
+│ 📈 PAYMENT HISTORY                       │
+│ Sort by: [Newest] [Oldest] [Amount]     │
+│                                          │
+│ Jan 15 - UI Design - ₹10,000 - PAID    │
+│ Jan 15 - Database - ₹10,000 - PAID      │
+│                                          │
+└──────────────────────────────────────────┘
+```
+
+**Payment Workflow Integration**:
+
+```
+Milestone Submission (Milestones tab)
+  ↓
+Client Approves (Milestones tab)
+  ↓
+Approval Notification (Chat & Notifications)
+  ↓
+Payment Auto-Released (Payments tab)
+  ↓
+Freelancer Receives Funds (External wallet)
+  ↓
+Activity Log Updated (Activity tab)
+  ↓
+Chat System Message (Chat tab)
+```
+
+---
+
+## 4. Workspace Header (Persistent)
+
+Visible on all tabs, shows critical project info:
+
+```
+┌─────────────────────────────────────────────┐
+│ Project: Build Website                      │
+│ Budget: ₹50,000 | Status: Active | 60% Done │
+│ Deadline: Mar 15, 2026 (59 days left)       │
+│ Freelancer: John Doe (★★★★★)                │
+│ [View Full Profile]                         │
+└─────────────────────────────────────────────┘
+```
+
+**Dynamic Elements**:
+- Project title (clickable → overview)
+- Budget progress bar
+- Status badge (Active, Under Review, Completed, Archived)
+- Countdown timer to deadline
+- Freelancer quick view
+
+**Header Actions**:
+- **Client**: [Message], [Release Payment], [End Project], [More Actions ▼]
+- **Freelancer**: [Message], [Submit Work], [View Invoices], [More Actions ▼]
+
+---
+
+## 5. User Roles & Permissions
+
+### Client Permissions
+
+```
+[Overview]    ✅ Full access
+[Milestones]  ✅ View all, approve/reject, request changes
+[Files]       ✅ Upload resources, view all, download, delete own
+[Chat]        ✅ Send messages, participate
+[Activity]    ✅ View all events
+[Payments]    ✅ View, release, track payments
+```
+
+### Freelancer Permissions
+
+```
+[Overview]    ✅ Full access
+[Milestones]  ✅ View all, submit work, resubmit after changes
+[Files]       ✅ Upload work, view all, download, delete own
+[Chat]        ✅ Send messages, participate
+[Activity]    ✅ View all events
+[Payments]    ✅ View payment status, track releases, download receipts
+```
+
+### Admin Permissions (Support)
+
+```
+[Overview]    ✅ Full access (for disputes)
+[Milestones]  ✅ View all (can't approve, only view)
+[Files]       ✅ View all (can't delete)
+[Chat]        ✅ View all (read-only)
+[Activity]    ✅ View all
+[Payments]    ✅ View all (dispute handling)
+```
+
+---
+
+## 6. Integrated Workflows
+
+### Workflow 1: Submit & Approve Milestone
+
+```
+Freelancer                          System                      Client
+    │                                 │                           │
+    │─── (1) Click "Submit"           │                           │
+    │         in Milestones Tab       │                           │
+    │                                 │                           │
+    │─── (2) Upload files ──────────→ 📤 Files stored             │
+    │                                 │                           │
+    │─── (3) Add notes ───────────→  📝 Notes saved               │
+    │                                 │                           │
+    │─── (4) Click "Submit" ────────→ 🔔 Notification sent        │
+    │                                 │                           │
+    │                                 │         ← 🔔 Alert: Milestone submitted
+    │                                 │                           │
+    │                                 │         ← (5) Opens workspace
+    │                                 │              & Milestones tab
+    │                                 │                           │
+    │                                 │         (6) Reviews files
+    │                                 │             & notes        │
+    │                                 │                           │
+    │                                 │         (7) Click
+    │                                 │             "Approve" ──→  ✅ Marked approved
+    │                                 │                           │
+    │  ← 💬 System Message: "Approved by client" ← (8) Chat message
+    │                                 │                           │
+    │  ← 💳 Payment Released ──────── ← (9) Milestone marked complete
+    │                                 │     & Payment auto-released
+    │  ← 💰 Funds in wallet           │
+    │                                 │                           │
+    │  ← 📊 Activity log updated ────→ 📊 Activity log updated
+```
+
+### Workflow 2: File Sharing During Chat
+
+```
+Client wants to share resources
+    ↓
+Opens [Files] tab
+    ↓
+Uploads "Brand Guidelines.pdf"
+    ↓
+Opens [Chat] tab
+    ↓
+Mentions file in message: "Check Brand Guidelines in Files tab"
+    ↓
+Freelancer receives notification
+    ↓
+Clicks notification → Opens workspace [Files] tab
+    ↓
+Downloads the file
+    ↓
+System logs: "File downloaded by Freelancer"
+```
+
+### Workflow 3: Payment Decision (After Hiring)
+
+```
+Project Created (Workspace opened)
+    ↓
+Payment system decides: Full or Milestone?
+    ↓
+[FULL PAYMENT]
+- Single payment option
+- Upfront payment suggestion (25% if budget > ₹3,000)
+- Freelancer sees: [Release Full Payment]
+- Client can choose when to pay (now or later)
+
+[MILESTONE PAYMENT]
+- Split by milestones
+- Auto-release on approval
+- Freelancer sees: Payment status per milestone
+- Client sees: Release buttons per milestone
+    ↓
+During project:
+- Freelancer submits → Payment tracks status
+- Client approves → Payment auto-releases
+- Freelancer receives → Notification in Chat & Payments tab
+```
+
+---
+
+## 7. Data Models
+
+### Project Model (Workspace-linked)
 
 ```javascript
-// In Job model
-const jobSchema = new Schema({
-  // ... existing fields
-  
-  paymentType: {
-    type: String,
-    enum: ["FIXED_PRICE", "HOURLY_RATE", "MILESTONE"],
-    required: true
-  },
-  
-  jobAmount: {
-    type: Number,
-    required: true,
-    min: 0
-  },
-  
-  currency: {
-    type: String,
-    default: "INR"
-  },
-  
-  // For FIXED_PRICE & HOURLY_RATE with amount > 3000
-  upfrontPaymentSuggested: {
-    type: Boolean,
-    default: false
-  },
-  
-  upfrontPaymentAccepted: {
-    type: Boolean,
-    default: false
-  },
-  
-  upfrontEscrowAmount: {
-    type: Number,
-    default: 0 // 25% if upfrontPaymentAccepted is true
-  }
-});
-```
-
-### Project Model Updates
-
-```javascript
-// In Project model (created after hiring)
 const projectSchema = new Schema({
+  _id: ObjectId,
+  
+  // Project basics
   jobId: {
     type: Schema.Types.ObjectId,
     ref: 'Job',
@@ -262,614 +706,613 @@ const projectSchema = new Schema({
     required: true
   },
   
-  paymentType: {
-    type: String,
-    enum: ["FIXED_PRICE", "HOURLY_RATE", "MILESTONE"],
-    required: true
-  },
+  title: String,
+  description: String,
   
-  totalAmount: {
+  // Budget & Timeline
+  budget: {
     type: Number,
     required: true
   },
   
-  upfrontPaymentAccepted: {
-    type: Boolean,
-    default: false
-  },
-  
-  upfrontEscrowAmount: {
+  spent: {
     type: Number,
     default: 0
   },
   
-  amountPaid: {
-    type: Number,
-    default: 0
-  },
+  deadline: Date,
   
+  // Status
   status: {
     type: String,
-    enum: ["ACTIVE", "COMPLETED", "CANCELLED"],
-    default: "ACTIVE"
+    enum: ['ACTIVE', 'UNDER_REVIEW', 'COMPLETED', 'ARCHIVED'],
+    default: 'ACTIVE'
   },
   
+  // Workspace access
+  workspaceCreatedAt: Date,
+  workspaceAccessibleBy: ['CLIENT', 'FREELANCER'],
+  
+  // Timestamps
   createdAt: {
     type: Date,
     default: Date.now
   },
   
-  completedAt: {
-    type: Date
-  }
+  completedAt: Date,
+  archivedAt: Date
 });
 ```
 
-### Milestone Model (NEW)
+### Workspace Activity Model
 
 ```javascript
-const milestoneSchema = new Schema({
+const workspaceActivitySchema = new Schema({
+  _id: ObjectId,
+  
   projectId: {
     type: Schema.Types.ObjectId,
     ref: 'Project',
-    required: true
-  },
-  
-  title: {
-    type: String,
-    required: true
-  },
-  
-  description: {
-    type: String
-  },
-  
-  amount: {
-    type: Number,
     required: true,
-    min: 0
+    index: true
   },
   
-  expectedDeliveryDate: {
-    type: Date
-  },
-  
-  status: {
+  activityType: {
     type: String,
-    enum: ["PENDING", "IN_PROGRESS", "SUBMITTED", "APPROVED", "RELEASED", "REJECTED"],
-    default: "PENDING"
-  },
-  
-  order: {
-    type: Number,
-    required: true // For sequencing
-  },
-  
-  submittedAt: {
-    type: Date
-  },
-  
-  approvedAt: {
-    type: Date
-  },
-  
-  paidAt: {
-    type: Date
-  },
-  
-  submissionDetails: {
-    description: String,
-    attachments: [String], // URLs
-    submittedBy: Schema.Types.ObjectId
-  },
-  
-  rejectionReason: String,
-  
-  createdAt: {
-    type: Date,
-    default: Date.now
-  }
-});
-```
-
-### Payment Transaction Model (NEW)
-
-```javascript
-const paymentTransactionSchema = new Schema({
-  projectId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Project',
+    enum: [
+      'MILESTONE_SUBMITTED',
+      'MILESTONE_APPROVED',
+      'MILESTONE_REJECTED',
+      'PAYMENT_RELEASED',
+      'FILE_UPLOADED',
+      'MESSAGE_SENT',
+      'FOLDER_CREATED',
+      'PROJECT_STATUS_CHANGED',
+      'DEADLINE_EXTENDED'
+    ],
     required: true
   },
   
-  milestoneId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Milestone'
-    // null for NO_MILESTONE payment or UPFRONT escrow
-  },
-  
-  amount: {
-    type: Number,
-    required: true
-  },
-  
-  transactionType: {
-    type: String,
-    enum: ["UPFRONT_ESCROW", "MILESTONE_PAYMENT", "FULL_PAYMENT", "REFUND"],
-    required: true
-  },
-  
-  status: {
-    type: String,
-    enum: ["PENDING", "SUCCESS", "FAILED"],
-    default: "PENDING"
-  },
-  
-  paymentGatewayId: String,
-  
-  paidBy: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  
-  releasedTo: {
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-    // null if payment still in escrow
-  },
-  
-  releasedAt: {
-    type: Date
+  actor: {
+    userId: Schema.Types.ObjectId,
+    role: String, // CLIENT or FREELANCER
+    name: String
   },
   
   description: String,
   
+  // Linked entities
+  linkedMilestoneId: Schema.Types.ObjectId,
+  linkedPaymentId: Schema.Types.ObjectId,
+  linkedFileId: Schema.Types.ObjectId,
+  linkedMessageId: Schema.Types.ObjectId,
+  
+  // Metadata
+  metadata: {
+    amount: Number,
+    oldValue: String,
+    newValue: String
+  },
+  
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
+    index: true
   }
 });
 ```
 
 ---
 
-## 3. API Endpoints
+## 8. API Endpoints
 
-### Upfront Payment Suggestion (NO MILESTONE)
+### Workspace Endpoints
 
-**Endpoint:** `GET /api/projects/:projectId/upfront-payment-suggestion`
+```
+GET /api/projects/:projectId/workspace
+- Get complete workspace data
+- Returns: Project, milestones, files, chat rooms, activity
+- Auth: Project participants only
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "projectId": "507f1f77bcf86cd799439070",
-    "paymentType": "FIXED_PRICE",
-    "totalAmount": 5000,
-    "amountThreshold": 3000,
-    "suggestUpfrontPayment": true,
-    "upfrontAmount": 1250,
-    "message": "Consider paying 25% upfront (₹1,250) to maintain trust and flexibility between parties. You'll be refunded if work isn't done properly.",
-    "acceptedByClient": false
-  }
+GET /api/projects/:projectId/overview
+- Get overview tab data
+- Returns: Summary, freelancer info, milestone progress
+
+GET /api/projects/:projectId/activity
+- Get activity timeline
+- Query params: type, dateRange, limit, page
+- Returns: Paginated activities with filters
+
+GET /api/projects/:projectId/workspace/status
+- Check workspace status
+- Returns: Current status, permissions, access level
+```
+
+### Related Endpoints (Integrated)
+
+```
+Milestones:
+GET /api/projects/:projectId/milestones
+POST /api/projects/:projectId/milestones/:milestoneId/submit
+POST /api/projects/:projectId/milestones/:milestoneId/approve
+
+Files:
+GET /api/projects/:projectId/files
+POST /api/projects/:projectId/files/upload
+GET /api/projects/:projectId/files/:fileId/download
+
+Chat:
+GET /api/chat-rooms/:projectId/messages
+POST /api/chat-rooms/:projectId/messages
+
+Payments:
+GET /api/projects/:projectId/payments
+POST /api/projects/:projectId/payments/:milestoneId/release
+GET /api/projects/:projectId/payments/history
+```
+
+---
+
+## 9. UI Components & Mockups
+
+### Workspace Main Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ OpenGigs Logo      Dashboard  Notifications  Account    │ ← Header
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│ Project: Build Website | ₹50,000 | 60% Done | Deadline │ ← Workspace Header
+│ Freelancer: John Doe (★★★★★)                            │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│ [Overview] [Milestones] [Files] [Chat] [Activity] [Payments] ← Tabs
+│                                                         │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│ [Tab Content Rendered Here]                            │
+│                                                         │
+│ (Content changes based on selected tab)                │
+│                                                         │
+│                                                         │
+│                                                         │
+│                                                         │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Responsive Design
+
+```
+Desktop (>1024px):
+- 6 tabs all visible
+- Full workspace content
+- Sidebar for quick actions
+
+Tablet (768-1023px):
+- 3 tabs visible + [More] dropdown
+- Adjusted spacing
+- Simplified layouts
+
+Mobile (<768px):
+- 1 tab visible + [More] dropdown
+- Vertical scrolling
+- Touch-optimized buttons
+```
+
+---
+
+## 10. Real-time Synchronization
+
+### WebSocket Events (Workspace-related)
+
+```javascript
+// New activity logged
+workspace:activity-created {
+  projectId,
+  activity: { type, actor, description, timestamp }
+}
+
+// Tab data updated
+workspace:milestone-updated {
+  projectId,
+  milestoneId,
+  newStatus,
+  updatedBy
+}
+
+workspace:payment-released {
+  projectId,
+  milestoneId,
+  amount,
+  timestamp
+}
+
+workspace:file-uploaded {
+  projectId,
+  fileId,
+  fileName,
+  uploadedBy,
+  timestamp
+}
+
+// Chat message in workspace context
+workspace:message-sent {
+  projectId,
+  message: { senderId, content, timestamp }
 }
 ```
 
-### Accept/Reject Upfront Payment Suggestion
+### Real-time Updates
 
-**Endpoint:** `POST /api/projects/:projectId/accept-upfront-payment`
+```
+When user is viewing [Overview] tab:
+├─ New milestone submission → Refresh progress bar
+├─ Payment released → Update spent amount
+├─ File uploaded → Show in recent files
+└─ New message → Activity notification
 
-**Request:**
-```json
-{
-  "accept": true,
-  "paymentMethodId": "pm_507f1f77bcf86cd"
-}
+When user is viewing [Milestones] tab:
+├─ Milestone status changes → Update status badge
+├─ Files uploaded → Show in submission
+└─ New feedback added → Alert user
+
+Cross-tab consistency:
+├─ Update in [Payments] → Reflects in [Overview]
+├─ Update in [Milestones] → Reflects in [Activity]
+└─ Update in [Chat] → Reflects in [Activity]
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "projectId": "507f1f77bcf86cd799439070",
-    "upfrontPaymentAccepted": true,
-    "escrowAmount": 1250,
-    "transactionId": "txn_507f1f77bcf86cd",
-    "status": "ESCROW_PAID",
-    "message": "Upfront payment of ₹1,250 has been held in escrow. Freelancer can now begin work."
-  }
-}
+---
+
+## 11. Notifications Integration
+
+### Workspace Notifications
+
+```
+In System Notification Center:
+
+1. "Milestone Submitted"
+   From: John | Project: Build Website
+   "Backend API milestone submitted for review"
+   Click → Opens workspace [Milestones] tab
+
+2. "Milestone Approved"
+   From: Client | Project: Build Website
+   "Database Schema approved - Payment released"
+   Click → Opens workspace [Payments] tab
+
+3. "Payment Released"
+   From: System | Project: Build Website
+   "₹10,000 released for Database Schema"
+   Click → Opens workspace [Payments] tab
+
+4. "File Uploaded"
+   From: John | Project: Build Website
+   "Backend code uploaded to Files"
+   Click → Opens workspace [Files] tab
+
+5. "New Message"
+   From: John | Project: Build Website
+   "Completed the API endpoints"
+   Click → Opens workspace [Chat] tab
 ```
 
-### Define Milestones (MILESTONE PAYMENT)
+### In-App Badges
 
-**Endpoint:** `POST /api/projects/:projectId/milestones/define`
+```
+Overview Tab:
+├─ Pending approvals: [2]
+├─ Unread messages: [3]
+└─ New activities: [5]
 
-**Request:**
-```json
-{
-  "milestones": [
-    {
-      "title": "UI Design",
-      "description": "Homepage & dashboard mockups",
-      "amount": 5000,
-      "expectedDeliveryDate": "2026-02-15",
-      "order": 1
-    },
-    {
-      "title": "Backend API",
-      "description": "REST API implementation",
-      "amount": 8000,
-      "expectedDeliveryDate": "2026-03-01",
-      "order": 2
-    },
-    {
-      "title": "Testing & QA",
-      "description": "Full testing and bug fixes",
-      "amount": 7000,
-      "expectedDeliveryDate": "2026-03-15",
-      "order": 3
-    }
-  ]
-}
+Milestones Tab:
+├─ Submitted waiting approval: [1]
+├─ Changes requested: [0]
+
+Files Tab:
+├─ New uploads: [2]
+
+Chat Tab:
+├─ Unread messages: [3]
+
+Payments Tab:
+├─ Pending releases: [1]
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "projectId": "507f1f77bcf86cd799439070",
-    "totalAmount": 20000,
-    "milestonesCreated": 3,
-    "upfrontPaymentSuggested": true,
-    "upfrontAmount": 5000,
-    "message": "Milestones defined. Total project cost ₹20,000 exceeds ₹3,000. Consider paying ₹5,000 (25%) upfront to maintain trust and flexibility.",
-    "milestones": [
-      {
-        "milestoneId": "507f1f77bcf86cd799439080",
-        "title": "UI Design",
-        "amount": 5000,
-        "order": 1,
-        "status": "PENDING"
-      },
-      // ...
-    ]
-  }
-}
+---
+
+## 12. Security & Access Control
+
+### Workspace Access Rules
+
+```
+✅ Can Access:
+- Project participants (client & freelancer)
+- Project owner (client)
+- OpenGigs admins (view-only for support)
+
+❌ Cannot Access:
+- Non-participants
+- Archived project (participants can view, not edit)
+- Deleted project
+
+Access Expires:
+- Project archived → View-only after 30 days
+- Project deleted → No access
 ```
 
-### Accept Upfront Payment for Milestone Project
+### Data Privacy
 
-**Endpoint:** `POST /api/projects/:projectId/accept-upfront-payment-milestone`
+```
+Client Cannot See:
+- Freelancer's personal messages in external channels
+- Freelancer's other projects
 
-**Request:**
-```json
-{
-  "accept": true,
-  "paymentMethodId": "pm_507f1f77bcf86cd"
-}
+Freelancer Cannot See:
+- Client's payment methods
+- Client's other projects
+- Other freelancers' bids
+
+Both Cannot See:
+- Admin support notes (hidden from both)
 ```
 
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "projectId": "507f1f77bcf86cd799439070",
-    "upfrontPaymentAccepted": true,
-    "escrowAmount": 5000,
-    "transactionId": "txn_507f1f77bcf86cd",
-    "status": "ESCROW_PAID",
-    "message": "Upfront payment of ₹5,000 (25%) has been held in escrow. Freelancer can now begin work."
-  }
-}
+### Audit Trail
+
 ```
+Every action logged:
+- Who: User ID & name
+- What: Action type
+- When: Timestamp
+- Where: Project & workspace
+- Result: Success/failure
 
-### Submit Milestone Work
-
-**Endpoint:** `POST /api/projects/:projectId/milestones/:milestoneId/submit`
-
-**Request:**
-```json
+Example: Approval audit
 {
-  "description": "Completed UI design with all requested revisions",
-  "attachments": ["https://s3.example.com/design-files.zip"]
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "milestoneId": "507f1f77bcf86cd799439080",
-    "projectId": "507f1f77bcf86cd799439070",
-    "status": "SUBMITTED",
-    "submittedAt": "2026-02-14T10:30:00Z",
-    "amount": 5000,
-    "message": "Work submitted for approval. Client has 5 days to review and approve."
-  }
-}
-```
-
-### Approve Milestone Work
-
-**Endpoint:** `POST /api/projects/:projectId/milestones/:milestoneId/approve`
-
-**Request:**
-```json
-{
-  "approved": true,
-  "feedback": "Excellent work! Exactly as requested."
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "milestoneId": "507f1f77bcf86cd799439080",
-    "projectId": "507f1f77bcf86cd799439070",
-    "status": "APPROVED",
-    "approvedAt": "2026-02-14T15:00:00Z",
-    "amount": 5000,
-    "message": "Milestone approved. Payment of ₹5,000 being released to freelancer."
-  }
-}
-```
-
-### Release Milestone Payment
-
-**Endpoint:** `POST /api/projects/:projectId/milestones/:milestoneId/release-payment`
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "milestoneId": "507f1f77bcf86cd799439080",
-    "projectId": "507f1f77bcf86cd799439070",
-    "status": "RELEASED",
-    "paidAt": "2026-02-14T15:05:00Z",
-    "amount": 5000,
-    "transactionId": "txn_507f1f77bcf86cd799439088",
-    "freelancerNotified": true,
-    "nextMilestoneOrder": 2,
-    "message": "Payment released. Freelancer can begin next milestone."
-  }
-}
-```
-
-### Reject Milestone Work
-
-**Endpoint:** `POST /api/projects/:projectId/milestones/:milestoneId/reject`
-
-**Request:**
-```json
-{
-  "approved": false,
-  "rejectionReason": "Missing some components from the design. Please revise and resubmit."
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "milestoneId": "507f1f77bcf86cd799439080",
-    "projectId": "507f1f77bcf86cd799439070",
-    "status": "REJECTED",
-    "rejectionReason": "Missing some components from the design. Please revise and resubmit.",
-    "message": "Milestone rejected. Freelancer can revise and resubmit."
-  }
-}
-```
-
-### Complete Project (NO MILESTONE)
-
-**Endpoint:** `POST /api/projects/:projectId/complete`
-
-**Request:**
-```json
-{
-  "clientApproval": true,
-  "paymentMethodId": "pm_507f1f77bcf86cd"
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "projectId": "507f1f77bcf86cd799439070",
-    "status": "COMPLETED",
-    "totalAmount": 3500,
-    "amountPaid": 3500,
-    "transactionId": "txn_507f1f77bcf86cd799439088",
-    "projectFiles": "https://s3.example.com/project-delivery.zip",
-    "completedAt": "2026-02-14T16:00:00Z",
-    "message": "Project completed and files delivered."
-  }
+  action: "MILESTONE_APPROVED",
+  actor: "client@example.com",
+  milestone: "Backend API",
+  timestamp: "2026-01-15T14:30:00Z",
+  ipAddress: "192.168.1.1"
 }
 ```
 
 ---
 
-## 4. UX Guidelines
+## 13. Testing & Acceptance Criteria
 
-### For Full Payment Option
+### Workspace Access & Loading
 
-**When Amount ≤ ₹3,000:**
-- No upfront payment notification shown
-- Simple flow: Freelancer completes work → Client reviews → Client pays → Files delivered
+✅ Workspace loads immediately after project creation
+✅ All 6 tabs accessible to both parties
+✅ Tab switching is fast (<500ms)
+✅ Workspace header shows correct project info
+✅ Archived projects show as read-only
+✅ Non-participants cannot access workspace
 
-**When Amount > ₹3,000:**
-- After work begins and is complete
-- Show notification card in job window:
-  ```
-  💡 Optional Trust & Flexibility Payment
-  
-  Consider paying 25% (₹1,250) upfront to maintain trust between you 
-  and the freelancer. You'll be fully refunded if work isn't done properly.
-  
-  [Accept & Pay Now] [Pay Later] [Dismiss]
-  ```
-- Notification appears in job window and can be dismissed
-- Client can pay anytime they want (before or after completion)
-- If accepted: funds held in escrow until work approval
+### Data Integrity
 
-### For Milestone-based Payment Option
+✅ Activity log captures all events
+✅ No data loss when tab switching
+✅ Milestone status updates reflect in Overview
+✅ Payment updates reflect in all tabs
+✅ File uploads appear immediately
+✅ Chat messages sync across workspace
 
-**Payment Type Selection (After Hiring):**
-- Display dialog showing both options with recommendations:
-  ```
-  Choose Payment Structure
-  
-  Option A: Full Payment
-  ├─ Best for: Projects ≤ ₹10,000
-  ├─ Simple and straightforward
-  ├─ Entire payment after completion
-  └─ [Select This]
-  
-  Option B: Milestone-based (Recommended for > ₹10,000)
-  ├─ Best for: Complex projects, high budgets
-  ├─ Staged payments as work completes
-  ├─ Better quality control
-  └─ [Select This]
-  
-  Or discuss with freelancer in chat first →
-  ```
+### Real-time Synchronization
 
-**During Milestone Definition:**
-- Display form for both client and freelancer to add milestones together
-- Show running total and verify it matches project amount
-- Display preview of milestone timeline
-- Show warning if total > ₹3,000: "You may want to pay 25% upfront for trust & flexibility"
+✅ New activity appears in Activity tab within 1 second
+✅ Milestone status changes reflect in Overview
+✅ Multiple users see same data simultaneously
+✅ Notification appears when event occurs
+✅ WebSocket connection re-establishes on disconnect
 
-**When Amount > ₹3,000 (During or After Milestone Definition):**
-- Show notification in job window:
-  ```
-  💡 Optional Trust & Flexibility Payment
-  
-  Consider paying 25% (₹5,000) upfront to maintain trust between you 
-  and the freelancer. You'll be fully refunded if work isn't done properly.
-  
-  [Accept & Pay Now] [Pay As Milestones Progress] [Dismiss]
-  ```
-- Notification appears and can be dismissed
-- Client can pay 25% upfront or pay milestone-by-milestone
+### Permissions & Security
 
-**Phase 2: Milestone Execution**
-- Show milestone progress bar with current/total milestones
-- For each milestone:
-  - Display title, amount, expected date
-  - Show status badge (PENDING → IN_PROGRESS → SUBMITTED → APPROVED → RELEASED)
-  - When submitted: show "Client reviewing..." with countdown (5 days)
-  - When approved: show payment release confirmation
-- After last milestone: show "Project Complete - All files delivered"
+✅ Client cannot approve own milestones
+✅ Freelancer cannot release own payments
+✅ Archived project shows view-only badges
+✅ Non-participants blocked from access
+✅ Audit trail logs all actions
+
+### UI/UX
+
+✅ Tab order is intuitive
+✅ All action buttons are visible
+✅ Loading states show during data fetch
+✅ Empty states handled gracefully
+✅ Responsive design works on all devices
+✅ No console errors or warnings
+
+### Cross-Tab Integration
+
+✅ Milestone approval → Payment released
+✅ File upload → Appears in Files tab
+✅ Chat message → Shows in Activity tab
+✅ Payment release → Chat system message
+✅ Status change → Updates in Overview
 
 ---
 
-## 5. Business Logic & Rules
+## 14. Implementation Checklist
 
-### Payment Type Selection Process
+### Phase 1: Core Workspace Structure
 
-1. **After Hiring & Agreement**: Client and freelancer meet to decide payment type
-   - Discuss project complexity and timeline
-   - Evaluate which option suits best
-   - Consider team comfort level
-   - Make final decision together
+- [ ] Create Workspace component wrapper
+- [ ] Build tab navigation system
+- [ ] Create workspace header with project info
+- [ ] Set up tab routing
+- [ ] Create responsive layout
 
-2. **For Projects ≤ ₹10,000**: Either option available
-   - Both Full Payment and Milestone-based are equally valid
-   - Team chooses based on preference
+### Phase 2: Overview Tab
 
-3. **For Projects > ₹10,000**: Milestone-based is recommended
-   - Full Payment still available if team prefers
-   - System suggests milestone-based but doesn't force
+- [ ] Project summary section
+- [ ] Freelancer profile card
+- [ ] Milestone progress bar
+- [ ] Recent activity feed (last 5)
+- [ ] Quick action buttons
+- [ ] Status indicators
 
-### Upfront Payment Rules
+### Phase 3: Milestones Tab
 
-1. **Amount ≤ ₹3,000**: No upfront payment notification shown
-2. **Amount > ₹3,000**: Show optional upfront payment notification in job window (after work begins)
-   - Appears as notification card (can be dismissed)
-   - Client can pay anytime (immediately or later)
-   - Funds held in escrow until work approval
-3. **Suggestion is optional**: Client can accept, decline, or dismiss
-4. **Refund guarantee**: If work isn't completed properly, full upfront amount refunded
-5. **Applies to all types**: Both Full Payment and Milestone-based projects
+- [ ] Milestone list view
+- [ ] Filter & sort functionality
+- [ ] Milestone details expanded view
+- [ ] File preview in submission
+- [ ] Approval/rejection UI
+- [ ] Comments/feedback section
+- [ ] Client approval buttons
+- [ ] Freelancer submit flow
 
-### Milestone Payment Rules
+### Phase 4: Files Tab
 
-1. **Both parties define milestones together** before work begins
-2. **Total milestone amounts must equal** project total amount
-3. **Milestones locked**: Cannot be changed after work begins
-4. **Milestones sequential**: Each must be approved before next starts
-5. **5-day review window**: Client has 5 days to approve/reject after submission
-6. **Resubmission allowed**: Freelancer can revise and resubmit rejected milestones
-7. **Final milestone**: When last milestone is approved, all project files delivered
+- [ ] Folder structure display
+- [ ] File upload functionality
+- [ ] Folder creation
+- [ ] File preview
+- [ ] Download functionality
+- [ ] Delete with confirmation
+- [ ] Upload progress indicator
+- [ ] Version history (optional)
 
-### Payment Rules
+### Phase 5: Chat Tab Integration
 
-1. **Escrow holds**: Upfront payments held in escrow until work completion
-2. **Payment sequence**: Only released after client approval (for milestones) or completion review (no milestone)
-3. **Partial refunds**: If project cancelled, refund of remaining amounts handled per cancellation policy
-4. **Transaction records**: All payments logged with timestamps and transaction IDs
+- [ ] Embed Chat component
+- [ ] Ensure workspace context
+- [ ] Real-time message sync
+- [ ] File sharing from Files tab
+- [ ] System message generation
+
+### Phase 6: Activity Tab
+
+- [ ] Activity list component
+- [ ] Filter by event type
+- [ ] Date range filtering
+- [ ] Pagination
+- [ ] Event detail links
+- [ ] Timeline view (optional)
+
+### Phase 7: Payments Tab Integration
+
+- [ ] Payment summary display
+- [ ] Milestone payment list
+- [ ] Payment history
+- [ ] Release payment buttons
+- [ ] Payment status badges
+- [ ] Receipt generation
+
+### Phase 8: Real-time Features
+
+- [ ] WebSocket connection management
+- [ ] Workspace activity events
+- [ ] Real-time data synchronization
+- [ ] Notification generation
+- [ ] Badge count updates
+- [ ] Cross-tab event sync
+
+### Phase 9: Permissions & Security
+
+- [ ] Role-based access control
+- [ ] Permission checks per action
+- [ ] Audit logging
+- [ ] Data privacy enforcement
+- [ ] XSS & CSRF protection
+
+### Phase 10: Testing & QA
+
+- [ ] Unit tests for components
+- [ ] Integration tests for workflows
+- [ ] E2E tests for user flows
+- [ ] Performance testing
+- [ ] Mobile responsive testing
+- [ ] Accessibility testing (WCAG 2.1)
+
+### Phase 11: Deployment
+
+- [ ] Code review
+- [ ] Documentation
+- [ ] Staff training
+- [ ] Staged rollout
+- [ ] Monitoring & analytics
+- [ ] User feedback collection
 
 ---
 
-## 6. Testing & Acceptance Criteria
+## 15. Performance Considerations
 
-- ✅ Upfront payment suggestion shows only when amount > ₹3,000
-- ✅ Client can accept or decline upfront payment without forcing
-- ✅ Milestone structure can be defined by both parties together
-- ✅ Total milestone amount matches project total
-- ✅ Milestones must be approved before payment released
-- ✅ Rejected milestones allow freelancer to resubmit
-- ✅ Final project delivery files included after last milestone approval
-- ✅ Upfront escrow refunded if work not done properly
-- ✅ All transactions recorded with proper status tracking
+### Optimization Strategies
 
----
+```
+1. Lazy Loading
+   - Load tab content only when selected
+   - Load activities as user scrolls
+   - Defer non-critical renders
 
-## 7. Implementation Checklist
+2. Caching
+   - Cache project overview (5 min)
+   - Cache file list (2 min)
+   - Cache payment history (10 min)
+   - Invalidate on updates
 
-### Database
-- [ ] Update Job model with payment fields
-- [ ] Create Project model
-- [ ] Create Milestone model
-- [ ] Create PaymentTransaction model
-- [ ] Add indexes for efficient queries
+3. Pagination
+   - Activities: 20 per page
+   - Files: 50 per page
+   - Messages: 50 per page
+   - Load more on scroll
 
-### Backend
-- [ ] Upfront payment suggestion endpoint
-- [ ] Accept/reject upfront payment endpoint
-- [ ] Milestone definition endpoint
-- [ ] Submit milestone endpoint
-- [ ] Approve/reject milestone endpoint
-- [ ] Release payment endpoint
-- [ ] Complete project endpoint
+4. Image Optimization
+   - Compress file thumbnails
+   - WebP format support
+   - Lazy load preview images
 
-### Frontend
-- [ ] Upfront payment suggestion UI (job window)
-- [ ] Milestone definition form
-- [ ] Milestone progress display
-- [ ] Milestone submission form
-- [ ] Approve/reject milestone interface
-- [ ] Payment status tracking
+5. API Optimization
+   - Single workspace endpoint (all data)
+   - Selective field loading
+   - Minimal payload size
+```
 
-### Payment Integration
-- [ ] Stripe/PayPal integration for upfront escrow
-- [ ] Refund handling for upfront payments
-- [ ] Payment release workflow
+### Expected Performance
+
+```
+Workspace Load: < 2 seconds
+Tab Switch: < 500ms
+Activity Load: < 1 second
+File Upload: Progress feedback every 100ms
+Real-time Event: < 1 second propagation
+```
 
 ---
 
-*Document created: comprehensive project payment and milestone system for production implementation.*
+## 16. Future Enhancements
+
+```
+Phase 2 Features (Post-Launch):
+├─ Project timeline/Gantt chart
+├─ Collaborative whiteboard
+├─ Time tracking integration
+├─ Invoice generation
+├─ Recurring projects
+├─ Team collaboration (multiple freelancers)
+└─ API for third-party integrations
+
+Analytics & Reporting:
+├─ Project completion rate
+├─ On-time delivery percentage
+├─ Average payment release time
+├─ Client satisfaction scores
+└─ Freelancer performance metrics
+```
+
+---
+
+## References
+
+- **Negotiations**: [5.NEGOTIATION.md](5.NEGOTIATION.md)
+- **Chat**: [7.PROJECT-CHAT.md](7.PROJECT-CHAT.md)
+- **Payments**: [6.PROJECT-PAYMENT.md](6.PROJECT-PAYMENT.md)
+- **Milestones**: (Document pending)
+
+---
+
+*Document created: Comprehensive Project Workspace documentation covering unified collaboration hub with 6 integrated tabs, workflows, data models, and implementation guide.*
