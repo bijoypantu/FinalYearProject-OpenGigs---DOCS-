@@ -4,6 +4,16 @@
 
 This module handles real-time negotiation, structured counter-offers, agreement generation, and the hire flow. It ensures legal clarity and prevents disputes by separating human conversation (chat) from contract data (proposal & agreement).
 
+### Job Types & Negotiable Terms
+- **Fixed Price Jobs**: Client and freelancer negotiate on:
+  - Project price/amount
+  - Delivery timeline (days)
+  
+- **Hourly Rate Jobs**: Client and freelancer negotiate on:
+  - Hourly rate
+  - Total estimated hours needed
+  - Deadline (by which the freelancer will complete the project)
+
 ---
 
 ## 1️⃣ Chat System Architecture (Socket.io)
@@ -143,22 +153,22 @@ const messageSchema = new Schema({
 
 Chat room is created automatically when:
 
-**Trigger 1: Proposal Submission**
+**Trigger 1: Client Initiates Negotiation**
 ```
-POST /api/proposals (freelancer submits proposal)
+Client clicks "Counter Offer" on proposal
   → ChatRoom created with:
     - jobId
     - proposalId
     - clientId
     - freelancerId
+    - Proposal.status → NEGOTIATING
 ```
 
-**Trigger 2: Manual Chat Request**
+**Trigger 2: Reopen Existing Chat**
 ```
-POST /api/chat/initiate (client clicks "Chat with freelancer")
-  → Check if ChatRoom exists
-  → If not, create new ChatRoom
-  → If yes, reopen existing
+Client clicks "Counter Offer" on same proposal again
+  → Use existing ChatRoom
+  → Continue conversation
 ```
 
 ---
@@ -328,38 +338,58 @@ const counterOfferSchema = new Schema({
     required: true
   },
   
+  // Only client can send final offer
   senderId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true
+    // Must be clientId
   },
   
   receiverId: {
     type: Schema.Types.ObjectId,
     ref: 'User',
     required: true
+    // Must be freelancerId
   },
   
-  originalAmount: Number,
-  originalDays: Number,
-  
+  // For Fixed Price Jobs
   counterAmount: {
     type: Number,
-    required: true,
     min: 0
   },
   
   counterDays: {
     type: Number,
-    required: true,
     min: 1
+  },
+  
+  // For Hourly Rate Jobs
+  hourlyRate: {
+    type: Number,
+    min: 0
+  },
+  
+  totalHours: {
+    type: Number,
+    min: 1
+  },
+  
+  deadline: {
+    type: Date
+  },
+  
+  jobType: {
+    type: String,
+    enum: ['FIXED_PRICE', 'HOURLY_RATE'],
+    required: true
   },
   
   message: String,
   
   status: {
     type: String,
-    enum: ['PENDING', 'ACCEPTED', 'REJECTED', 'COUNTERED'],
+    enum: ['PENDING', 'ACCEPTED', 'REJECTED'],
     default: 'PENDING'
   },
   
@@ -400,11 +430,12 @@ Client: "Can you do ₹4200 in 6 days?"
 Freelancer: "Yes, that works for me."
 ```
 
-**Action:** Client clicks "Send Counter Offer"
+**Action:** Client clicks "Submit Final Offer"
 
 ```javascript
-POST /api/proposals/:proposalId/counter-offer
+POST /api/proposals/:proposalId/final-offer
 {
+  jobType: "FIXED_PRICE",
   counterAmount: 4200,
   counterDays: 6,
   message: "Can you do this amount in 6 days?" // Optional
@@ -416,14 +447,13 @@ POST /api/proposals/:proposalId/counter-offer
 {
   "success": true,
   "data": {
-    "counterOfferId": "507f1f77bcf86cd799439050",
+    "offerId": "507f1f77bcf86cd799439050",
     "proposalId": "507f1f77bcf86cd799439011",
     "senderId": "507f1f77bcf86cd799439010", // Client
     "receiverId": "507f1f77bcf86cd799439012", // Freelancer
-    "originalAmount": 4500,
-    "originalDays": 5,
     "counterAmount": 4200,
     "counterDays": 6,
+    "jobType": "FIXED_PRICE",
     "status": "PENDING",
     "expiresAt": "2026-01-18T10:30:00Z",
     "message": "Can you do this amount in 6 days?"
@@ -432,7 +462,7 @@ POST /api/proposals/:proposalId/counter-offer
 ```
 
 **System Action:**
-- Create CounterOffer record
+- Create Counter-Offer record
 - Broadcast to freelancer in real-time
 - Send notification to freelancer
 
@@ -441,7 +471,7 @@ POST /api/proposals/:proposalId/counter-offer
 **Option A: Freelancer Accepts**
 
 ```javascript
-POST /api/counter-offers/:offerId/accept
+POST /api/final-offers/:offerId/accept
 ```
 
 **Response:**
@@ -449,7 +479,7 @@ POST /api/counter-offers/:offerId/accept
 {
   "success": true,
   "data": {
-    "counterOfferId": "507f1f77bcf86cd799439050",
+    "offerId": "507f1f77bcf86cd799439050",
     "status": "ACCEPTED",
     "proposalUpdated": {
       "proposalId": "507f1f77bcf86cd799439011",
@@ -476,14 +506,12 @@ proposal.status = "AGREED"
 
 ---
 
-**Option B: Freelancer Counter-Offers**
+**Option B: Freelancer Rejects**
 
 ```javascript
-POST /api/counter-offers/:offerId/counter
+POST /api/final-offers/:offerId/reject
 {
-  counterAmount: 4300,
-  counterDays: 5,
-  message: "I can do 4300 but need 5 days"
+  reason: "I cannot accept this rate"
 }
 ```
 
@@ -492,30 +520,22 @@ POST /api/counter-offers/:offerId/counter
 {
   "success": true,
   "data": {
-    "newCounterOfferId": "507f1f77bcf86cd799439051",
-    "previousCounterId": "507f1f77bcf86cd799439050",
-    "status": "COUNTERED",
-    "message": "Counter-offer created. Client will review."
+    "offerId": "507f1f77bcf86cd799439050",
+    "status": "REJECTED",
+    "message": "Offer rejected. You can modify and resubmit."
   }
 }
 ```
 
 ---
 
-**Option C: Freelancer Rejects**
-
-```javascript
-POST /api/counter-offers/:offerId/reject
-{
-  reason: "I cannot go below 4400"
-}
-```
+**After Rejection:** Client can continue chatting and modify the final offer if both parties agree on different terms. The client can resubmit a modified final offer.
 
 ---
 
 ### 2.3 Counter-Offer History
 
-**Endpoint:** `GET /api/proposals/:proposalId/counter-offers`
+**Endpoint:** `GET /api/proposals/:proposalId/final-offers`
 
 **Response:**
 ```json
@@ -527,22 +547,16 @@ POST /api/counter-offers/:offerId/reject
       {
         "round": 1,
         "initiator": "CLIENT",
-        "amount": 4500,
-        "days": 5,
-        "status": "INITIAL",
+        "jobType": "FIXED_PRICE",
+        "amount": 4200,
+        "days": 6,
+        "status": "REJECTED",
         "createdAt": "2026-01-10T10:30:00Z"
       },
       {
         "round": 2,
         "initiator": "CLIENT",
-        "amount": 4200,
-        "days": 6,
-        "status": "PENDING",
-        "createdAt": "2026-01-10T11:00:00Z"
-      },
-      {
-        "round": 3,
-        "initiator": "FREELANCER",
+        "jobType": "FIXED_PRICE",
         "amount": 4300,
         "days": 5,
         "status": "ACCEPTED",
@@ -564,11 +578,11 @@ POST /api/counter-offers/:offerId/reject
 
 ```
 ✅ Chat messages = Discussion only
-✅ CounterOffer object = Source of truth for final terms
-✅ Proposal object = Stores finalAmount & finalDays
+✅ Final Offer object = Source of truth for final terms (client submits only)
+✅ Proposal object = Stores finalAmount & finalDays after freelancer acceptance
 ```
 
-### Data Flow
+### Data Flow (Fixed Price Job)
 
 ```
 1. Initial Proposal
@@ -577,15 +591,40 @@ POST /api/counter-offers/:offerId/reject
 
 2. Chat: "Can you do 4200 in 6 days?"
 
-3. Client sends CounterOffer
+3. Client submits Final Offer
    ├─ counterAmount: 4200
    └─ counterDays: 6
 
-4. Freelancer accepts CounterOffer
+4. Freelancer accepts Final Offer
 
 5. System updates Proposal
    ├─ finalAmount: 4200
    ├─ finalDays: 6
+   └─ status: "AGREED"
+
+6. Agreement generated with final values
+```
+
+### Data Flow (Hourly Rate Job)
+
+```
+1. Initial Proposal
+   ├─ proposedHourlyRate: 50
+   └─ estimatedHours: 40
+
+2. Chat: "Can you do $55/hour for 40 hours, deadline March 15?"
+
+3. Client submits Final Offer
+   ├─ hourlyRate: 55
+   ├─ totalHours: 40
+   └─ deadline: "2026-03-15"
+
+4. Freelancer accepts Final Offer
+
+5. System updates Proposal
+   ├─ finalHourlyRate: 55
+   ├─ finalTotalHours: 40
+   ├─ finalDeadline: "2026-03-15"
    └─ status: "AGREED"
 
 6. Agreement generated with final values
@@ -598,6 +637,7 @@ POST /api/counter-offers/:offerId/reject
 ✅ **Audit trail**: Full negotiation history preserved  
 ✅ **Database consistency**: Single source of truth per field  
 ✅ **Easy enforcement**: Can directly reference in contract  
+✅ **Clear responsibility**: Only client can submit final terms
 
 ---
 
@@ -707,14 +747,22 @@ const agreementSchema = new Schema({
 
 ### 4.2 When Agreement is Generated
 
-**Trigger:** When `proposal.status = "AGREED"`
+**Trigger:** When `proposal.status = "AGREED"` (after freelancer accepts final offer)
 
 ```javascript
-// In counterOffer.accept()
-async function acceptCounterOffer(offerId) {
-  // Update proposal
-  proposal.finalAmount = counterOffer.counterAmount
-  proposal.finalDays = counterOffer.counterDays
+// In finalOffer.accept()
+async function acceptFinalOffer(offerId) {
+  const finalOffer = await FinalOffer.findById(offerId)
+  
+  // Update proposal with final terms
+  if (finalOffer.jobType === 'FIXED_PRICE') {
+    proposal.finalAmount = finalOffer.counterAmount
+    proposal.finalDays = finalOffer.counterDays
+  } else {
+    proposal.finalHourlyRate = finalOffer.hourlyRate
+    proposal.finalTotalHours = finalOffer.totalHours
+    proposal.finalDeadline = finalOffer.deadline
+  }
   proposal.status = "AGREED"
   
   // Auto-generate agreement
@@ -723,8 +771,8 @@ async function acceptCounterOffer(offerId) {
     proposalId: proposal._id,
     clientId: proposal.clientId,
     freelancerId: proposal.freelancerId,
-    finalAmount: proposal.finalAmount,
-    finalDays: proposal.finalDays,
+    jobType: finalOffer.jobType,
+    finalOffer: finalOffer,
     paymentType: job.paymentType
   })
   
@@ -959,15 +1007,19 @@ async function acceptCounterOffer(offerId) {
 ```
 Proposal submitted
      ↓
-Chat opens & negotiation begins
+Client clicks "Counter Offer" to start negotiation
+     ↓
+ChatRoom created & Proposal.status → NEGOTIATING
      ↓
 Chat: Client & Freelancer discuss terms
      ↓
-Client sends Counter Offer
+Client submits Final Offer (fixed price or hourly rate)
      ↓
-Freelancer accepts/counters/rejects
+Freelancer accepts or rejects Final Offer
      ↓
-Once agreed: proposal.status = "AGREED"
+If rejected: Client can modify offer and resubmit after chat discussion
+     ↓
+If accepted: proposal.status = "AGREED"
      ↓
 System auto-generates Agreement document
      ↓
@@ -977,7 +1029,7 @@ Freelancer clicks "Sign Agreement"
      ↓
 Client clicks "Sign & Hire Freelancer"
      ↓
-System checks: freelancerSigned = true
+System checks: freelancerSigned = true AND clientSigned = true
      ↓
 System creates Project
      ↓
@@ -1153,7 +1205,7 @@ async function hireFreelancer(agreementId, paymentData) {
 ┌─────────────────────────┐
 │   JOB POSTED            │
 │   Budget: 4300          │
-│   paymentType: FULL     │
+│   jobType: FIXED_PRICE  │
 └────────────┬────────────┘
              │
              ▼
@@ -1161,13 +1213,19 @@ async function hireFreelancer(agreementId, paymentData) {
 │  PROPOSAL SUBMITTED     │
 │  Amount: 4500           │
 │  Days: 5                │
-│  Status: PENDING        │
+│  Status: SUBMITTED      │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│ CLIENT INITIATES        │
+│ Clicks "Counter Offer"  │
 └────────────┬────────────┘
              │
              ▼
 ┌─────────────────────────┐
 │  CHATROOM CREATED       │
-│  jobId, proposalId      │
+│  Status: NEGOTIATING    │
 │  Real-time messaging    │
 └────────────┬────────────┘
              │
@@ -1179,23 +1237,63 @@ async function hireFreelancer(agreementId, paymentData) {
              │
              ▼
 ┌─────────────────────────┐
-│ COUNTER OFFER SENT      │
-│ Amount: 4200            │
-│ Days: 6                 │
+│ CLIENT SUBMITS          │
+│ FINAL OFFER             │
+│ Amount: 4200 / Days: 6  │
 │ Status: PENDING         │
 └────────────┬────────────┘
              │
-             ▼
-┌─────────────────────────┐
-│ COUNTER OFFER ACCEPTED  │
-│ Status: ACCEPTED        │
-└────────────┬────────────┘
+      ┌──────┴──────┐
+      │             │
+      ▼             ▼
+   ACCEPT        REJECT
+      │             │
+      │    Client can modify
+      │    and resubmit
+      │             │
+      └──────┬──────┘
              │
              ▼
 ┌─────────────────────────┐
 │ PROPOSAL UPDATED        │
 │ finalAmount: 4200       │
 │ finalDays: 6            │
+│ Status: AGREED          │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│ AGREEMENT GENERATED     │
+│ Status: PENDING_SIG     │
+│ Terms locked in         │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│ FREELANCER SIGNS        │
+│ Status: FREELANCER_SIGNED
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│ CLIENT SIGNS & HIRES    │
+│ Status: FULLY_SIGNED    │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│ PROJECT CREATED         │
+│ Escrow: 25% locked      │
+│ Status: ACTIVE          │
+└────────────┬────────────┘
+             │
+             ▼
+┌─────────────────────────┐
+│ JOB IN_PROGRESS         │
+│ Chat→Workspace          │
+│ Freelancer starts work  │
+└─────────────────────────┘
+```
 │ Status: AGREED          │
 └────────────┬────────────┘
              │
@@ -1241,23 +1339,23 @@ async function hireFreelancer(agreementId, paymentData) {
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/chat/initiate` | Open chat with freelancer |
-| GET | `/api/chat/:chatRoomId` | Get chat messages |
-| POST | `/api/chat/:chatRoomId/message` | Send message |
-| POST | `/api/chat/:chatRoomId/file` | Send file |
+| POST | `/api/proposals/:proposalId/chat` | Open chat (create or reopen) |
+| GET | `/api/chat/:chatRoomId/messages` | Get chat messages |
+| POST | `/api/proposals/:proposalId/final-offer` | Client submits final offer |
+| POST | `/api/final-offers/:offerId/accept` | Freelancer accepts offer |
+| POST | `/api/final-offers/:offerId/reject` | Freelancer rejects offer |
 | PUT | `/api/chat/message/:messageId` | Edit message |
 | DELETE | `/api/chat/message/:messageId` | Delete message |
-| GET | `/api/chat/rooms` | Get all chat rooms |
+| GET | `/api/proposals/:proposalId/final-offers` | View negotiation history |
 
-### Counter-Offer Endpoints
+### Counter-Offer / Final-Offer Endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| POST | `/api/proposals/:proposalId/counter-offer` | Send counter offer |
-| GET | `/api/proposals/:proposalId/counter-offers` | Get negotiation history |
-| POST | `/api/counter-offers/:offerId/accept` | Accept offer |
-| POST | `/api/counter-offers/:offerId/counter` | Send counter offer |
-| POST | `/api/counter-offers/:offerId/reject` | Reject offer |
+| POST | `/api/proposals/:proposalId/final-offer` | Client submits final offer (fixed or hourly) |
+| GET | `/api/proposals/:proposalId/final-offers` | Get all final offers history |
+| POST | `/api/final-offers/:offerId/accept` | Freelancer accepts final offer |
+| POST | `/api/final-offers/:offerId/reject` | Freelancer rejects final offer |
 
 ### Agreement Endpoints
 
@@ -1300,15 +1398,17 @@ socket.on('user:online', (data) => {})
 socket.on('user:offline', (data) => {})
 socket.on('user:typing', (data) => {})
 
-// Counter offers
-socket.on('offer:received', (data) => {})
+// Final Offers (only client submits)
+socket.on('offer:submitted', (data) => {})
 socket.on('offer:accepted', (data) => {})
 socket.on('offer:rejected', (data) => {})
+socket.on('offer:modified', (data) => {})
 
 // Agreement
 socket.on('agreement:generated', (data) => {})
 socket.on('agreement:signed', (data) => {})
 socket.on('hire:confirmed', (data) => {})
+```
 ```
 
 ---
