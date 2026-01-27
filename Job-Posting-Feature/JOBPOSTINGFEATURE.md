@@ -9,7 +9,7 @@ Purpose: enable clients to post jobs and publish jobs so freelancers can discove
 
 ## 1) Client flow summary
 
-### Preconditions (Step 0)
+### Preconditions (Step 0) 
 Before posting a job, the system MUST ensure the client:
 - has **completed onboarding** (User.isOnboardingCompleted === true)
 - has **verified email & mobile** (isEmailVerified && isMobileVerified)
