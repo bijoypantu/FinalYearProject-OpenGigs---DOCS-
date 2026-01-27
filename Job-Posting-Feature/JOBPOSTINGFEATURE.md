@@ -1,7 +1,7 @@
 # Job Posting Feature — Functional Design (JOBPOSTINGFEATURE.md)
 
 ## Overview
-This document describes the Client flow for posting jobs, the multi-step job form, business rules (escrow, budget minimums, expiry), recommended database models, API endpoints, payments/escrow flow (Razorpay), attachments handling, and validations.
+This document describes the Client flow for posting jobs, the multi-step job form, business rules (budget minimums, expiry), recommended database models, API endpoints, attachments handling, and validations.
 
 Purpose: enable clients to post jobs and publish jobs so freelancers can discover and apply.
 
@@ -9,7 +9,7 @@ Purpose: enable clients to post jobs and publish jobs so freelancers can discove
 
 ## 1) Client flow summary
 
-### Preconditions (Step 0)
+### Preconditions (Step 0) 
 Before posting a job, the system MUST ensure the client:
 - has **completed onboarding** (User.isOnboardingCompleted === true)
 - has **verified email & mobile** (isEmailVerified && isMobileVerified)
@@ -25,7 +25,7 @@ Wizard sections (recommended):
 2. Budget & Timeline
 3. Attachments
 4. Visibility & Preferences
-5. Escrow Confirmation (Fund & Publish)
+5. Review & Publish
 
 (See Section 2 for detailed fields.)
 
@@ -41,7 +41,7 @@ When publish action is confirmed, job status becomes `OPEN` and is visible to fr
 |---|---:|---|
 | title | ✅ | "Build e-commerce website" |
 | category | ✅ | "Web Development" |
-| jobType | ✅ | `fixed_price` / `hourly` |
+
 | description | ✅ | "Need MERN developer to build..." |
 | skills | ✅ | ["React","Node","MongoDB"] |
 
@@ -62,8 +62,8 @@ Optional files: PDF, images, docs, ZIP. Store as signed URLs or via `/uploads` e
 | allowNegotiation | ✅ | boolean (default true) |
 | requireVerifiedFreelancer | ❌ | boolean, filters applicants |
 
-### Section 5 — Confirmation
-Client reviews all job details and clicks **Publish**. The job becomes `OPEN` and is immediately visible to freelancers.
+### Section 5 — Review & Publish
+Client reviews all job details and clicks **Publish**. The job becomes `OPEN` and is immediately visible to freelancers. No upfront payment or escrow is required to publish.
 
 ---
 
@@ -76,8 +76,7 @@ Client reviews all job details and clicks **Publish**. The job becomes `OPEN` an
 ---
 
 ## 4) Recommended statuses
-- `DRAFT` — job created but not funded/published
-- `PENDING_FUNDS` — waiting for payment capture
+- `DRAFT` — job created but not published
 - `OPEN` — published and visible to freelancers
 - `FILLED` — client accepted a proposal / hired
 - `CLOSED` — job completed and closed
@@ -101,7 +100,7 @@ const jobSchema = new mongoose.Schema({
 
   title: { type: String, required: true, trim: true },
   category: { type: String, required: true, index: true },
-  jobType: { type: String, enum: ['fixed_price','hourly'], required: true },
+  jobType: { type: String, enum: ['fixed_price'], required: true },
   description: { type: String, required: true },
   skills: [{ type: String }],
 
@@ -117,7 +116,7 @@ const jobSchema = new mongoose.Schema({
   allowNegotiation: { type: Boolean, default: true },
   requireVerifiedFreelancer: { type: Boolean, default: false },
 
-  status: { type: String, enum: ['DRAFT','PENDING_FUNDS','OPEN','FILLED','CLOSED','EXPIRED','CANCELLED','DELETED'], default: 'DRAFT', index: true },
+  status: { type: String, enum: ['DRAFT','OPEN','FILLED','CLOSED','EXPIRED','CANCELLED','DELETED'], default: 'DRAFT', index: true },
 
   proposalsCount: { type: Number, default: 0 },
 
@@ -140,13 +139,12 @@ All endpoints should be under `/api/v1` and require authentication. Only clients
 ### POST /api/v1/jobs
 Create a job draft or request to publish with payment.
 
-Request (create draft):
+Request (create and publish job):
 ```json
 POST /api/v1/jobs
 {
   "title": "Build e-commerce website",
   "category": "Web Development",
-  "jobType": "fixed_price",
   "description": "Need MERN developer",
   "skills": ["React","Node"],
   "budgetAmount": 5000,
@@ -199,7 +197,7 @@ Response (200):
 ---
 
 ## 9) Notifications & webhooks
-- Send notifications on: job published, payment captured, refund processed, job expired, proposal received.
+- Send notifications on: job published, job expired, proposal received.
 - Provide webhook for partner integrations if required.
 
 ---
