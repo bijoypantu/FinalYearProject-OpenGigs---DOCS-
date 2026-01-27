@@ -9,7 +9,7 @@ Purpose: enable clients to post jobs and publish jobs so freelancers can discove
 
 ## 1) Client flow summary
 
-### Preconditions (Step 0) 
+### Preconditions (Step 0)
 Before posting a job, the system MUST ensure the client:
 - has **completed onboarding** (User.isOnboardingCompleted === true)
 - has **verified email & mobile** (isEmailVerified && isMobileVerified)
@@ -40,8 +40,6 @@ When publish action is confirmed, job status becomes `OPEN` and is visible to fr
 | Field | Required | Example |
 |---|---:|---|
 | title | ✅ | "Build e-commerce website" |
-| category | ✅ | "Web Development" |
-
 | description | ✅ | "Need MERN developer to build..." |
 | skills | ✅ | ["React","Node","MongoDB"] |
 
@@ -99,8 +97,6 @@ const jobSchema = new mongoose.Schema({
   },
 
   title: { type: String, required: true, trim: true },
-  category: { type: String, required: true, index: true },
-  jobType: { type: String, enum: ['fixed_price'], required: true },
   description: { type: String, required: true },
   skills: [{ type: String }],
 
@@ -129,7 +125,7 @@ const jobSchema = new mongoose.Schema({
 ```
 
 Notes:
-- Index `client`, `status`, `expiresAt`, `category` for queries.
+- Index `client`, `status`, `expiresAt` for queries.
 
 ---
 
@@ -144,7 +140,6 @@ Request (create and publish job):
 POST /api/v1/jobs
 {
   "title": "Build e-commerce website",
-  "category": "Web Development",
   "description": "Need MERN developer",
   "skills": ["React","Node"],
   "budgetAmount": 5000,
@@ -190,9 +185,9 @@ Response (200):
 ---
 
 ## 8) Indexes, performance & queries
-- Index: `client`, `status`, `expiresAt`, `category` and `skills` for discovery.
+- Index: `client`, `status`, `expiresAt` and `skills` for discovery.
 - Use text index on `title` and `description` for search.
-- Paginate `/jobs` list and add filters: category, budget range, experienceLevel, visibility.
+- Paginate `/jobs` list and add filters: budget range, experienceLevel, visibility.
 
 ---
 
