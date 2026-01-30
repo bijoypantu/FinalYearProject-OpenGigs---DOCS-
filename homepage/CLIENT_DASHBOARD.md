@@ -98,15 +98,11 @@ Personalized greeting to create a welcoming user experience and establish contex
 
 ### Layout & Structure
 
-**Format**: `Good [Morning/Afternoon/Evening], [Client Name]! 👋`
-
-- **Morning**: 6 AM - 11:59 AM
-- **Afternoon**: 12 PM - 5:59 PM
-- **Evening**: 6 PM - 5:59 AM
+**Format**: `Welcome Back, [Client Name]! 👋`
 
 ### Components
 
-- **Dynamic Greeting Text** - Based on current time
+- **Greeting Text** - Static "Welcome Back" message
 - **Client Name** - Fetched from user profile (first name or full name)
 - **Emoji/Icon** - Waving hand or greeting icon for visual appeal
 - **Subtext** (Optional): Brief motivational or contextual message (e.g., "You have 2 new bids on your jobs")
@@ -185,58 +181,47 @@ Display quick summary of posted jobs and provide easy access to post new jobs. A
 ## Searching Mechanism
 
 ### Purpose
-Provide dual-mode search functionality to help clients find talent or discover projects. Acts as a gateway to the main search/discovery page with pre-filtered results.
+Provide dual-mode exploration functionality to help clients find talent or discover projects for inspiration. Acts as a gateway to the main search/discovery page with pre-filtered results.
 
 ### Layout & Structure
 
 **Title**: "Find What You Need"
 
 **Toggle Buttons** (Side by Side):
-1. **Talents** - Search for individual freelancers
-2. **Projects** - Search for projects (if applicable in your platform)
+1. **Freelancers** - Browse and search for individual freelancers
+2. **Projects** - Browse projects to get inspiration
 
 **Only one can be active at a time**
 
-### Search Input
+### Popular Work Titles
 
-- **Placeholder Text** (Contextual):
-  - If "Talents" active: "Search by skill, expertise, or name..."
-  - If "Projects" active: "Search by project type, technology, or keyword..."
+**Display**: Horizontal scrollable row of popular work title tags/pills:
+- Examples: "Frontend Developer", "WordPress Developer", "Graphic Designer", "Content Writer", "UI/UX Designer", etc.
+- Each tag is clickable and styled as a rounded pill or button
 
-- **Components**:
-  - Text input field
-  - Search icon inside input or as button
-  - Clear/Reset button (X icon)
+**Behavior on Click**:
+- Navigate to the main search/discovery page
+- Pre-filter results by the selected work title
+- Pass filter parameter in URL: `/search?mode=freelancers&workTitle=FrontendDeveloper`
+- Display matching freelancer/project profiles based on the selected title
 
-- **Width**: Full width of container or constrained to reasonable max-width (600-800px)
-
-### Behavior
-
-1. **On Toggle**: 
-   - Change visual state of active toggle
-   - Update search placeholder
-   - Clear previous search input (optional)
-
-2. **On Search**:
-   - User types keyword
-   - Optional real-time suggestions (debounced)
-   - On Enter or click search icon:
-     - Navigate to main search page
-     - Pass search query as URL parameter: `/search?mode=talents&q=keyword`
-     - Pre-filter results based on selected mode
-
-3. **Suggestion Dropdown** (Optional):
-   - Show trending searches
-   - Show recent searches
-   - Show popular skill/project categories
-   - Each suggestion is clickable and navigates to search results
+**Browse All Button**:
+- Positioned at the end of the popular titles row
+- Text: "Browse All" or "See All"
+- Behavior on Click:
+  - Navigate to the main search/discovery page
+  - No pre-filters applied (show all available profiles)
+  - Allow clients to interact with all available filters (skills, location, rating, hourly rate, etc.)
+  - Clients can sort and refine results based on their specific needs
+  - URL: `/search?mode=freelancers` or `/search?mode=projects`
 
 ### Styling
 
 - **Section Padding**: Consistent with other dashboard sections
 - **Toggle Design**: Button group or tab-like appearance
-- **Input Field**: Rounded corners, subtle border, focus state with color change
-- **Search Results Link**: Clear call-to-action text
+- **Popular Title Tags**: Rounded pills with border or background color, hover state with slight color change
+- **Browse All Button**: Prominent call-to-action styling, clearly distinguishable from title tags
+- **Scrolling**: Smooth horizontal scroll with optional arrow buttons on mobile
 
 ---
 
